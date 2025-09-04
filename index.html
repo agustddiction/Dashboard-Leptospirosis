@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <title>Dashboard Kasus Rabies + Peta & PE</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    :root { --bg:#f7f7fb; --card:#fff; --text:#1f2937; --muted:#6b7280; --pri:#0ea5e9; --pri2:#0369a1; --warn:#f59e0b; --err:#ef4444; --ok:#10b981;}
+    *{box-sizing:border-box}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;background:var(--bg);color:var(--text);margin:24px}
+    h1{margin:0 0 12px}
+    .wrap{max-width:1300px;margin:auto;display:grid;grid-template-columns:1fr;gap:20px}
+    .card{background:var(--card);border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,.06);padding:18px}
+    label{display:block;margin-top:10px;font-weight:600}
+    input,select,textarea{width:100%;padding:10px;margin-top:6px;border:1px solid #e5e7eb;border-radius:10px}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+    button{cursor:pointer;border:0;background:var(--pri);color:#fff;padding:10px 14px;border-radius:10px;font-weight:600}
+    button:hover{background:var(--pri2)}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid #f0f0f0;font-size:14px;text-align:left;vertical-align:top}
+    th{background:#f9fafb;font-weight:700}
+    .toolbar{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+    .pill{display:inline-block;background:#eef6ff;color:#0b6aaa;padding:6px 10px;border-radius:999px;font-size:12px}
+    .muted{color:var(--muted);font-size:13px}
+    .empty{padding:24px;text-align:center;color:var(--muted)}
+    .alert{border-radius:12px;padding:10px 12px;margin-top:10px;display:none}
+    .alert.warn{background:#FFF7ED;border:1px solid #FED7AA;color:#9A3412}
+    .alert.err{background:#FEF2F2;border:1px solid #FECACA;color:#991B1B}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+    .danger{background:var(--err)}
+    .ghost{background:#eef2ff;color:#111827}
+    .ok{background:var(--ok);color:#fff}
+    #map{width:100%;height:420px;border-radius:14px;overflow:hidden}
+    .grid-2{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+    @media (max-width:1000px){.grid-2{grid-template-columns:1fr}}
+    @media (max-width:780px){.row,.row-3{grid-template-columns:1fr}}
+    .small{font-size:12px;color:#6b7280}
+    .cfg-table td, .cfg-table th{font-size:13px}
+    .cfg-table input{padding:6px}
+    .badge-ok{display:inline-block;background:#DCFCE7;color:#166534;padding:2px 8px;border-radius:999px;font-size:12px}
+    .badge-no{display:inline-block;background:#FEF2F2;color:#991B1B;padding:2px 8px;border-radius:999px;font-size:12px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+
+    <div class="card">
+      <h1>📌 Dashboard Kasus Rabies</h1>
+      <div class="muted">
+        Form sesuai elemen inti pedoman tatalaksana rabies (identitas, pajanan, kategori, tatalaksana WPR/VAR/RIG, status) + PE & peta sebaran kab/kota. Data tersimpan lokal (<em>localStorage</em>).
+      </div>
+    </div>
+
+    <!-- FORM INPUT -->
+    <div class="card">
+      <h2 style="margin-top:0">Form Input Data Kasus</h2>
+
+      <div id="ruleAlert" class="alert warn">
+        ⚠️ <b>Catatan:</b> Untuk <b>Kategori III</b>, RIG/SAR <b>direkomendasikan</b> selain WPR + VAR. Periksa kembali isian Anda.
+      </div>
+      <div id="blockAlert" class="alert err">
+        ✋ <b>Tidak valid:</b> Kategori III dipilih, tetapi <b>RIG/SAR</b> diisi <i>Tidak</i>. Ubah ke <b>Ya</b> atau <b>Tidak Perlu</b> (sesuai indikasi).
+      </div>
+
+      <form id="rabiesForm">
+        <!-- Identitas -->
+        <div class="row">
+          <div>
+            <label>Nama Pasien</label>
+            <input type="text" name="nama" required />
+          </div>
+          <div>
+            <label>NIK/ID (opsional)</label>
+            <input type="text" name="nik" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label>Umur (tahun)</label>
+            <input type="number" name="umur" min="0" required />
+          </div>
+          <div>
+            <label>Jenis Kelamin</label>
+            <select name="jk" required>
+              <option value="">--Pilih--</option>
+              <option>Laki-laki</option>
+              <option>Perempuan</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label>Kabupaten/Kota</label>
+            <input type="text" name="kabkota" placeholder="contoh: Sumenep" required />
+          </div>
+          <div>
+            <label>Provinsi</label>
+            <input type="text" name="provinsi" placeholder="contoh: Jawa Timur" />
+          </div>
+        </div>
+
+        <label>Alamat</label>
+        <textarea name="alamat" rows="2" placeholder="RT/RW/Desa/Kec (opsional)"></textarea>
+
+        <!-- Riwayat Pajanan -->
+        <h3>Riwayat Pajanan</h3>
+        <div class="row-3">
+          <div>
+            <label>Tanggal Pajanan</label>
+            <input type="date" name="tgl_pajanan" required />
+          </div>
+          <div>
+            <label>Jenis Hewan Penular</label>
+            <select name="hewan" required>
+              <option value="">--Pilih--</option>
+              <option>Anjing</option><option>Kucing</option><option>Kera</option><option>Kelelawar</option><option>Hewan lain</option>
+            </select>
+          </div>
+          <div>
+            <label>Hewan Divaksin?</label>
+            <select name="hewan_vaksin">
+              <option value="">Tidak diketahui</option>
+              <option>Ya</option><option>Tidak</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label>Lokasi Luka/Gigitan</label>
+            <input type="text" name="lokasi_luka" placeholder="mis. jari tangan kanan" />
+          </div>
+          <div>
+            <label>Kategori Pajanan</label>
+            <select name="kategori" id="kategori" required>
+              <option value="">--Pilih--</option>
+              <option>Kategori I</option>
+              <option>Kategori II</option>
+              <option>Kategori III</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Tatalaksana -->
+        <h3>Tatalaksana di Fasyankes</h3>
+        <div class="row-3">
+          <div>
+            <label>Tanggal Datang Fasyankes</label>
+            <input type="date" name="tgl_fasyankes" required />
+          </div>
+          <div>
+            <label>WPR (Cuci Luka 15 menit)</label>
+            <select name="wpr" required>
+              <option value="">--Pilih--</option>
+              <option>Ya</option><option>Tidak</option>
+            </select>
+          </div>
+          <div>
+            <label>VAR (Vaksin Anti Rabies)</label>
+            <select name="var" required>
+              <option value="">--Pilih--</option>
+              <option>Ya</option><option>Tidak</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label>RIG/SAR (Imunoglobulin/Serum)</label>
+            <select name="rig" id="rig">
+              <option value="">--Pilih--</option>
+              <option>Ya</option><option>Tidak</option><option>Tidak Perlu</option>
+            </select>
+          </div>
+          <div>
+            <label>Regimen VAR</label>
+            <select name="regimen">
+              <option value="">Tidak diisi</option>
+              <option>IM Essen (0-3-7-14-28)</option>
+              <option>ID Thai Red Cross (0-3-7-28)</option>
+              <option>Lainnya</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- PE -->
+        <h3>Penyelidikan Epidemiologi (PE)</h3>
+        <div class="row">
+          <div>
+            <label>PE Dilakukan?</label>
+            <select name="pe_status" id="pe_status">
+              <option value="">--Pilih--</option>
+              <option>Ya</option>
+              <option>Belum</option>
+            </select>
+          </div>
+          <div>
+            <label>Tanggal PE</label>
+            <input type="date" name="tgl_pe" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Link Google Drive (PDF PE)</label>
+            <input type="url" name="pe_drive_url" placeholder="Tempel tautan berbagi dari Google Drive (opsional)" />
+            <div class="small">Tip: upload PDF ke Drive → setel “Siapa saja dengan tautan: Viewer” → tempel link di sini.</div>
+          </div>
+          <div>
+            <label>Unggah PDF (lokal, opsional)</label>
+            <input type="file" id="pe_pdf" accept="application/pdf" />
+            <div class="small">File tidak dikirim ke server; hanya untuk pratinjau lokal sementara.</div>
+          </div>
+        </div>
+
+        <label>Keterangan Tambahan</label>
+        <textarea name="keterangan" rows="2"></textarea>
+
+        <div class="actions">
+          <button type="submit">Simpan Data</button>
+          <button type="button" id="resetBtn" class="danger">Hapus Semua Data</button>
+          <button type="button" id="exportBtn" class="ghost">Ekspor CSV</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- REKAP & FILTER -->
+    <div class="card">
+      <div class="toolbar">
+        <div class="pill" id="totalKasus">0 kasus terekam</div>
+        <div class="pill" id="totalKab">0 kab/kota</div>
+        <div style="margin-left:auto"></div>
+        <div>
+          <label class="muted" style="margin:0 0 6px;display:block">Filter Kab/Kota</label>
+          <select id="filterKab" style="min-width:220px;padding:10px;border:1px solid #e5e7eb;border-radius:10px">
+            <option value="__ALL__">Semua Kab/Kota</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="margin-top:12px;overflow:auto">
+        <table id="tabelKasus">
+          <thead>
+            <tr>
+              <th>Tgl Pajanan</th><th>Nama</th><th>Umur</th><th>JK</th><th>Kab/Kota</th>
+              <th>Hewan</th><th>Kategori</th><th>WPR</th><th>VAR</th><th>RIG/SAR</th>
+              <th>PE</th><th>Link PE</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="13" class="empty">Belum ada data</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PETA + PENGATURAN KOORDINAT -->
+    <div class="grid-2">
+      <div class="card">
+        <h2 style="margin-top:0">Peta Sebaran Kasus (Kab/Kota)</h2>
+        <div id="map"></div>
+        <div class="small" style="margin-top:8px">
+          Ukuran lingkaran proporsional dengan jumlah kasus per kab/kota. Klik lingkaran untuk detail.
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">Pengaturan Peta (Koordinat Kab/Kota)</h3>
+        <div class="small" style="margin-bottom:8px">
+          Tambahkan koordinat <b>pusat kab/kota</b> agar marker tampil di lokasi yang tepat. Minimal <i>Latitude</i> & <i>Longitude</i>.
+        </div>
+        <table class="cfg-table" style="width:100%">
+          <thead><tr><th>Kab/Kota</th><th>Lat</th><th>Lng</th><th></th></tr></thead>
+          <tbody id="cfgBody"></tbody>
+        </table>
+        <div class="actions">
+          <input id="cfgKab" placeholder="Nama Kab/Kota" />
+          <input id="cfgLat" placeholder="Lat" />
+          <input id="cfgLng" placeholder="Lng" />
+          <button id="cfgAdd" class="ok">Tambah/Update</button>
+          <button id="cfgReset" class="danger">Reset Koordinat</button>
+        </div>
+        <div class="small" style="margin-top:8px">
+          Koordinat tersimpan lokal. Contoh cepat: <i>Sumenep: -6.926, 113.905</i>; <i>Denpasar: -8.65, 115.216</i>.
+        </div>
+      </div>
+    </div>
+
+    <!-- GRAFIK -->
+    <div class="card">
+      <h2 style="margin-top:0">Grafik Tren Kasus per Bulan</h2>
+      <div class="row">
+        <div>
+          <label class="muted" style="margin:0 0 6px;display:block">Pilih Kab/Kota untuk Tren</label>
+          <select id="kabForChart" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:10px">
+            <option value="__ALL__">Semua Kab/Kota</option>
+          </select>
+        </div>
+        <div>
+          <label class="muted" style="margin:0 0 6px;display:block">Rentang Bulan Otomatis</label>
+          <input id="hintRange" disabled value="–" />
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <canvas id="trendChart" height="110"></canvas>
+      </div>
+    </div>
+
+    <!-- GRAFIK TOP 5 -->
+    <div class="card">
+      <h2 style="margin-top:0">Top 5 Kab/Kota (Jumlah Kasus)</h2>
+      <div class="row">
+        <div>
+          <label class="muted" style="margin:0 0 6px;display:block">Berdasarkan Tahun</label>
+          <select id="yearForTop" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:10px">
+            <option value="__ALL__">Semua Tahun</option>
+          </select>
+        </div>
+        <div>
+          <label class="muted" style="margin:0 0 6px;display:block">Catatan</label>
+          <input id="topHint" disabled value="–" />
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <canvas id="topChart" height="120"></canvas>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // ===== UTIL =====
+    const storageKey = "rabies_cases_v2";
+    const cfgKey = "rabies_map_cfg_v1";
+    const $ = (sel) => document.querySelector(sel);
+
+    function loadData(){ try { return JSON.parse(localStorage.getItem(storageKey)) || []; } catch { return []; } }
+    function saveData(arr){ localStorage.setItem(storageKey, JSON.stringify(arr)); }
+    function loadCfg(){ try { return JSON.parse(localStorage.getItem(cfgKey)) || {}; } catch { return {}; } }
+    function saveCfg(obj){ localStorage.setItem(cfgKey, JSON.stringify(obj)); }
+    function yyyymm(dateStr){ if(!dateStr) return ""; const d=new Date(dateStr); if(isNaN(d)) return ""; return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
+    function yearOnly(dateStr){ if(!dateStr) return ""; const d=new Date(dateStr); if(isNaN(d)) return ""; return d.getFullYear().toString(); }
+    function formatDate(d){ if(!d) return "-"; const dt=new Date(d); if(isNaN(dt)) return d; return dt.toLocaleDateString("id-ID"); }
+    function download(filename, text){ const a=document.createElement('a'); a.href='data:text/plain;charset=utf-8,'+encodeURIComponent(text); a.download=filename; a.click(); }
+    function toCSV(records){
+      if(!records.length) return "";
+      const headers = Array.from(new Set(records.flatMap(r=>Object.keys(r))));
+      const lines=[headers.join(",")];
+      for(const r of records){
+        const row = headers.map(h=>{
+          const val = (r[h]??"").toString().replaceAll('"','""');
+          return /[",\n]/.test(val) ? `"${val}"` : val;
+        });
+        lines.push(row.join(","));
+      }
+      return lines.join("\n");
+    }
+
+    // ===== STATE =====
+    let data = loadData();
+    let cfg = loadCfg(); // { "Sumenep": {lat:-6.926, lng:113.905}, ... }
+    let trendChart, topChart, map, mapLayer;
+
+    // ===== VALIDATION: Kategori III & RIG =====
+    const kategoriSel = $("#kategori");
+    const rigSel = $("#rig");
+    const ruleAlert = $("#ruleAlert");
+    const blockAlert = $("#blockAlert");
+    function validateRules(){
+      const kategori = kategoriSel.value, rig = rigSel.value;
+      ruleAlert.style.display = (kategori==="Kategori III") ? "block":"none";
+      if(kategori==="Kategori III" && rig==="Tidak"){ blockAlert.style.display="block"; return false; }
+      blockAlert.style.display="none"; return true;
+    }
+    kategoriSel.addEventListener("change", validateRules);
+    rigSel.addEventListener("change", validateRules);
+
+    // ===== SUMMARY =====
+    function renderSummary(){
+      $("#totalKasus").textContent = `${data.length} kasus terekam`;
+      const setKab = new Set(data.map(r=>r.kabkota?.trim()).filter(Boolean));
+      $("#totalKab").textContent = `${setKab.size} kab/kota`;
+    }
+
+    // ===== TABLE =====
+    function renderTable(){
+      const tbody = $("#tabelKasus tbody");
+      tbody.innerHTML="";
+      const kabFilter = $("#filterKab").value;
+      const rows = data
+        .filter(r => kabFilter==="__ALL__" || (r.kabkota||"")===kabFilter)
+        .sort((a,b)=> (a.tgl_pajanan||"").localeCompare(b.tgl_pajanan||""));
+
+      if(!rows.length){ const tr=document.createElement("tr"); const td=document.createElement("td"); td.colSpan=13; td.className="empty"; td.textContent="Tidak ada data untuk filter ini"; tr.appendChild(td); tbody.appendChild(tr); return; }
+
+      for(const r of rows){
+        const badge = r.pe_status==="Ya" ? '<span class="badge-ok">Ya</span>' : (r.pe_status ? '<span class="badge-no">Belum</span>' : "-");
+        const link = r.pe_drive_url ? `<a href="${r.pe_drive_url}" target="_blank" rel="noopener">Buka PDF</a>` : "-";
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${formatDate(r.tgl_pajanan)}</td>
+          <td>${r.nama||"-"}</td>
+          <td>${r.umur??"-"}</td>
+          <td>${r.jk||"-"}</td>
+          <td>${r.kabkota||"-"}</td>
+          <td>${r.hewan||"-"}</td>
+          <td>${r.kategori||"-"}</td>
+          <td>${r.wpr||"-"}</td>
+          <td>${r.var||"-"}</td>
+          <td>${r.rig||"-"}</td>
+          <td>${badge}</td>
+          <td>${link}</td>
+          <td>${r.status||"-"}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    // ===== FILTER & OPTIONS =====
+    function renderKabOptions(){
+      const kabSet = Array.from(new Set(data.map(d=>d.kabkota).filter(Boolean))).sort();
+      const filterKab = $("#filterKab");
+      const kabForChart = $("#kabForChart");
+      const current1 = filterKab.value, current2 = kabForChart.value;
+      const opts = `<option value="__ALL__">Semua Kab/Kota</option>` + kabSet.map(k=>`<option>${k}</option>`).join("");
+      filterKab.innerHTML = opts; kabForChart.innerHTML = opts;
+      if(kabSet.includes(current1)) filterKab.value=current1;
+      if(kabSet.includes(current2)) kabForChart.value=current2;
+    }
+
+    // ===== AGGREGATIONS =====
+    function aggregateMonthly(kab){
+      const filtered = data.filter(r => !kab || kab==="__ALL__" || r.kabkota===kab);
+      const map = new Map();
+      for(const r of filtered){
+        const key = yyyymm(r.tgl_pajanan); if(!key) continue;
+        map.set(key, (map.get(key)||0)+1);
+      }
+      const labels = Array.from(map.keys()).sort();
+      const counts = labels.map(l=>map.get(l));
+      return {labels, counts};
+    }
+    function humanRange(labels){
+      if(!labels.length) return "–";
+      const toName = s => { const [y,m]=s.split("-"); const d=new Date(+y, +m-1, 1); return d.toLocaleString("id-ID",{month:"short",year:"numeric"}); };
+      return `${toName(labels[0])} – ${toName(labels[labels.length-1])}`;
+    }
+    function getYearsAvailable(){ return Array.from(new Set(data.map(d=>yearOnly(d.tgl_pajanan)).filter(Boolean))).sort(); }
+    function renderYearOptions(){
+      const sel=$("#yearForTop"), curr=sel.value, items=getYearsAvailable();
+      sel.innerHTML = `<option value="__ALL__">Semua Tahun</option>` + items.map(y=>`<option>${y}</option>`).join("");
+      if(items.includes(curr)) sel.value=curr;
+    }
+    function aggregateTop5(year="__ALL__"){
+      const map = new Map();
+      for(const r of data){
+        if(!r.kabkota) continue;
+        if(year!=="__ALL__" && yearOnly(r.tgl_pajanan)!==year) continue;
+        map.set(r.kabkota, (map.get(r.kabkota)||0)+1);
+      }
+      const arr = Array.from(map.entries()).sort((a,b)=>b[1]-a[1]).slice(0,5);
+      return {labels:arr.map(e=>e[0]), counts:arr.map(e=>e[1])};
+    }
+
+    // ===== CHARTS =====
+    function renderTrendChart(){
+      const kab = $("#kabForChart").value;
+      const {labels, counts} = aggregateMonthly(kab);
+      $("#hintRange").value = humanRange(labels);
+      const ctx = $("#trendChart").getContext("2d");
+      if(trendChart) trendChart.destroy();
+      trendChart = new Chart(ctx, {
+        type:"line",
+        data:{ labels, datasets:[{ label: kab==="__ALL__"?"Semua Kab/Kota":kab, data:counts, tension:.25, fill:false, pointRadius:3 }]},
+        options:{ plugins:{ legend:{display:true} }, scales:{ y:{beginAtZero:true,ticks:{precision:0},title:{display:true,text:"Jumlah Kasus"}}, x:{title:{display:true,text:"Bulan (YYYY-MM)"}} } }
+      });
+    }
+    function renderTopChart(){
+      const year=$("#yearForTop").value;
+      const {labels, counts} = aggregateTop5(year);
+      $("#topHint").value = labels.length ? `Total ${counts.reduce((a,b)=>a+b,0)} kasus` : "–";
+      const ctx = $("#topChart").getContext("2d");
+      if(topChart) topChart.destroy();
+      topChart = new Chart(ctx, {
+        type:"bar",
+        data:{ labels, datasets:[{ label: year==="__ALL__"?"Semua Tahun":`Tahun ${year}`, data:counts }]},
+        options:{ plugins:{legend:{display:true}}, scales:{ y:{beginAtZero:true,ticks:{precision:0},title:{display:true,text:"Jumlah Kasus"}}, x:{title:{display:true,text:"Kab/Kota"}} } }
+      });
+    }
+
+    // ===== MAP =====
+    function initMap(){
+      map = L.map('map').setView([-2.5,118], 5);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 18, attribution:'© OpenStreetMap'}).addTo(map);
+      mapLayer = L.layerGroup().addTo(map);
+      renderMap();
+    }
+    function groupByKab(){
+      const m = new Map();
+      for(const r of data){
+        if(!r.kabkota) continue;
+        const key = r.kabkota.trim();
+        const arr = m.get(key)||[];
+        arr.push(r); m.set(key, arr);
+      }
+      return m; // kab -> array kasus
+    }
+    function renderMap(){
+      if(!mapLayer) return;
+      mapLayer.clearLayers();
+      const m = groupByKab();
+      let bounds = [];
+      m.forEach((arr, kab)=>{
+        const cfgEntry = cfg[kab];
+        const count = arr.length;
+        if(!cfgEntry){ return; } // belum ada koordinat; tidak digambar
+        const lat = parseFloat(cfgEntry.lat), lng=parseFloat(cfgEntry.lng);
+        if(Number.isNaN(lat)||Number.isNaN(lng)) return;
+
+        const radius = 20000 * Math.sqrt(count); // skala sederhana
+        const circle = L.circle([lat,lng], { radius, color:'#2563eb', fillColor:'#3b82f6', fillOpacity:0.35, weight:1 });
+        const list = arr.slice(-10).map(r=>`• ${formatDate(r.tgl_pajanan)} - ${r.nama||"-"} (${r.kategori||"-"})`).join("<br>");
+        const popup = `
+          <b>${kab}</b><br>
+          ${count} kasus terekam<br><br>
+          <b>Contoh entri terbaru:</b><br>${list || "-"}
+        `;
+        circle.bindPopup(popup);
+        circle.addTo(mapLayer);
+        bounds.push([lat,lng]);
+      });
+      if(bounds.length){ map.fitBounds(bounds, {padding:[20,20]}); }
+    }
+
+    // ===== CFG TABLE =====
+    function renderCfgTable(){
+      const body = $("#cfgBody");
+      body.innerHTML = "";
+      const rows = Object.keys(cfg).sort();
+      if(!rows.length){ body.innerHTML = `<tr><td colspan="4" class="empty">Belum ada koordinat. Tambahkan pada form di bawah.</td></tr>`; return; }
+      for(const k of rows){
+        const tr=document.createElement("tr");
+        tr.innerHTML = `<td>${k}</td><td>${cfg[k].lat}</td><td>${cfg[k].lng}</td>
+          <td><button data-k="${k}" class="danger" style="padding:6px 10px;border-radius:8px">Hapus</button></td>`;
+        body.appendChild(tr);
+      }
+      body.querySelectorAll("button").forEach(btn=>{
+        btn.addEventListener("click", ()=>{
+          const key = btn.getAttribute("data-k");
+          delete cfg[key]; saveCfg(cfg); renderCfgTable(); renderMap();
+        });
+      });
+    }
+
+    // ===== EXPORT CSV =====
+    function exportCSV(){
+      if(!data.length){ alert("Belum ada data untuk diekspor."); return; }
+      const sorted = [...data].sort((a,b)=> (a.tgl_pajanan||"").localeCompare(b.tgl_pajanan||""));
+      const csv = toCSV(sorted);
+      const stamp = new Date().toISOString().slice(0,10);
+      download(`kasus_rabies_${stamp}.csv`, csv);
+    }
+
+    // ===== FORM EVENTS =====
+    $("#rabiesForm").addEventListener("submit", (e)=>{
+      e.preventDefault();
+      if(!validateRules()){ window.scrollTo({top:0, behavior:"smooth"}); return; }
+      const form = e.target;
+      const rec = Object.fromEntries(new FormData(form).entries());
+      rec.umur = rec.umur ? Number(rec.umur) : null;
+
+      // baca file PDF lokal (opsional) hanya untuk URL lokal
+      const file = document.getElementById("pe_pdf").files[0];
+      rec.pe_local_url = file ? URL.createObjectURL(file) : "";
+
+      data.push(rec);
+      saveData(data);
+      form.reset();
+      validateRules();
+      renderSummary(); renderKabOptions(); renderTable();
+      renderTrendChart(); renderYearOptions(); renderTopChart();
+      renderMap();
+      alert("✅ Data kasus rabies berhasil disimpan.");
+    });
+
+    $("#resetBtn").addEventListener("click", ()=>{
+      if(confirm("Hapus semua data yang tersimpan di perangkat ini?")){
+        data = []; saveData(data);
+        renderSummary(); renderKabOptions(); renderTable();
+        renderTrendChart(); renderYearOptions(); renderTopChart();
+        renderMap();
+      }
+    });
+
+    $("#exportBtn").addEventListener("click", exportCSV);
+    $("#filterKab").addEventListener("change", renderTable);
+    $("#kabForChart").addEventListener("change", renderTrendChart);
+    $("#yearForTop").addEventListener("change", renderTopChart);
+
+    // CFG handlers
+    $("#cfgAdd").addEventListener("click", ()=>{
+      const k = $("#cfgKab").value.trim();
+      const lat = parseFloat($("#cfgLat").value);
+      const lng = parseFloat($("#cfgLng").value);
+      if(!k || Number.isNaN(lat) || Number.isNaN(lng)){ alert("Lengkapi nama kab/kota dan koordinat yang valid."); return; }
+      cfg[k] = {lat, lng}; saveCfg(cfg);
+      $("#cfgKab").value=""; $("#cfgLat").value=""; $("#cfgLng").value="";
+      renderCfgTable(); renderMap();
+    });
+    $("#cfgReset").addEventListener("click", ()=>{
+      if(confirm("Reset semua koordinat kab/kota?")){ cfg = {}; saveCfg(cfg); renderCfgTable(); renderMap(); }
+    });
+
+    // ===== INIT =====
+    renderSummary(); renderKabOptions(); renderTable();
+    renderYearOptions();
+    initMap();
+    renderTrendChart(); renderTopChart();
+    validateRules();
+    renderCfgTable();
+
+    // ===== OPTIONAL: Google Picker/API Drive (hook) =====
+    // Jika ingin integrasi penuh (pilih file dari Drive), siapkan API Key & OAuth Client ID,
+    // lalu gunakan Google Picker API di sini untuk mengambil link file dan isi ke input pe_drive_url.
+    // Dokumentasi: https://developers.google.com/picker
+  </script>
+</body>
+</html>
