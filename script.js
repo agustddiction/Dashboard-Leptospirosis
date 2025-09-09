@@ -1,75 +1,49 @@
-
 // =====================
-// KONFIG
+// KONFIGURASI
 // =====================
-const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbxFHgRel9-LTQTc0YIjy5G22BWk1RiqUjjDqCd8XE1Q4tF8h4t5r8X9WL-MwVZ2IyyYHg/exec';
 const ACCESS_TOKEN = 'ZOOLEPTO123';
-const DEFAULT_GH = 'https://raw.githubusercontent.com/agustddiction/Dashboard-Leptospirosis/main/data/provinsi.json'; // RAW only
+const DEFAULT_GH = 'https://raw.githubusercontent.com/agustddiction/Dashboard-Leptospirosis/main/provinsi.json';
+const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbxFHgRel9-LTQTc0YIjy5G22BWk1RiqUjjDqCd8XE1Q4tF8h4t5r8X9WL-MwVZ2IyyYHg/exec';
 
 // =====================
-// TOKEN GATE (klik & Enter, +auto unlock via ?token=)
+// TOKEN GATE
 // =====================
-function showLock(){
-  const lock = document.getElementById('lock');
-  if(lock){ lock.classList.remove('hidden'); document.body.classList.add('locked'); setTimeout(()=>{ document.getElementById('tokenInput')?.focus(); }, 50); }
-}
-function hideLock(){
-  const lock = document.getElementById('lock');
-  if(lock){ lock.remove(); document.body.classList.remove('locked'); }
-}
+function showLock(){ const lock=document.getElementById('lock'); if(lock){ lock.classList.remove('hidden'); document.body.classList.add('locked'); setTimeout(()=>document.getElementById('tokenInput')?.focus(),50);} }
+function hideLock(){ const lock=document.getElementById('lock'); if(lock){ lock.remove(); document.body.classList.remove('locked'); } }
 function verifyToken(){
-  const val = (document.getElementById('tokenInput')?.value||'').trim();
-  const err = document.getElementById('lockErr');
-  if(val === ACCESS_TOKEN){
-    localStorage.setItem('lepto_token_ok','1');
-    hideLock();
-  } else {
-    if(err){ err.textContent='Token salah. Coba lagi.'; err.style.display='block'; }
-  }
+  const val=(document.getElementById('tokenInput')?.value||'').trim();
+  const err=document.getElementById('lockErr');
+  if(val===ACCESS_TOKEN){ localStorage.setItem('lepto_token_ok','1'); hideLock(); } else { if(err){err.textContent='Token salah. Coba lagi.'; err.style.display='block';} }
 }
-function autoUnlockFromURL(){
-  try{
-    const usp = new URLSearchParams(location.search);
-    const t = usp.get('token');
-    if(t && t === ACCESS_TOKEN){ localStorage.setItem('lepto_token_ok','1'); hideLock(); }
-  }catch(_){}
-}
-(function(){
-  const ok = localStorage.getItem('lepto_token_ok')==='1';
-  if(!ok) showLock();
+function autoUnlockFromURL(){ try{ const t=new URLSearchParams(location.search).get('token'); if(t===ACCESS_TOKEN){ localStorage.setItem('lepto_token_ok','1'); hideLock(); } }catch(e){} }
+(function(){ const ok=localStorage.getItem('lepto_token_ok')==='1'; if(!ok) showLock();
   document.getElementById('unlockBtn')?.addEventListener('click', verifyToken);
-  document.addEventListener('keydown', (e)=>{
-    const lock = document.getElementById('lock');
-    if(lock && !lock.classList.contains('hidden') && e.key==='Enter') verifyToken();
-  });
+  document.addEventListener('keydown', e=>{ const lock=document.getElementById('lock'); if(lock && !lock.classList.contains('hidden') && e.key==='Enter') verifyToken(); });
   autoUnlockFromURL();
 })();
 
 // =====================
 // DATA MASTER PROV-KAB
 // =====================
-let PROV_KAB = {};
-fetch('data/kabkota.json').then(r=>r.json()).then(j=>{ PROV_KAB=j; initProvKab(); }).catch(()=>{
-  PROV_KAB = {"Aceh":["Kabupaten Aceh Besar"]};
-  initProvKab();
-});
+let PROV_KAB={};
+fetch('data/kabkota.json').then(r=>r.json()).then(j=>{ PROV_KAB=j; initProvKab(); }).catch(()=>{ PROV_KAB={"Aceh":["Kabupaten Aceh Besar"]}; initProvKab(); });
 
-const GEJALA = [
-  {id:"demam", label:"Demam akut"},
-  {id:"nyeriKepala", label:"Nyeri kepala"},
-  {id:"mialgia", label:"Mialgia"},
-  {id:"malaise", label:"Malaise / Lemah"},
-  {id:"conj", label:"Conjunctival suffusion"},
-  {id:"nyeriBetis", label:"Nyeri betis"},
-  {id:"jaundice", label:"Jaundice / Ikterik"},
-  {id:"batuk", label:"Batuk dgn/tnp darah"},
-  {id:"perdarahan", label:"Manifestasi perdarahan"},
-  {id:"anuria", label:"Anuria / Oliguria"},
-  {id:"aritmia", label:"Aritmia jantung"},
-  {id:"ruam", label:"Ruam kulit"},
-  {id:"sesak", label:"Sesak napas"},
+const GEJALA=[
+  {id:"demam",label:"Demam akut"},
+  {id:"nyeriKepala",label:"Nyeri kepala"},
+  {id:"mialgia",label:"Mialgia"},
+  {id:"malaise",label:"Malaise / Lemah"},
+  {id:"conj",label:"Conjunctival suffusion"},
+  {id:"nyeriBetis",label:"Nyeri betis"},
+  {id:"jaundice",label:"Jaundice / Ikterik"},
+  {id:"batuk",label:"Batuk dgn/tnp darah"},
+  {id:"perdarahan",label:"Manifestasi perdarahan"},
+  {id:"anuria",label:"Anuria / Oliguria"},
+  {id:"aritmia",label:"Aritmia jantung"},
+  {id:"ruam",label:"Ruam kulit"},
+  {id:"sesak",label:"Sesak napas"},
 ];
-const PAPARAN = [
+const PAPARAN=[
   "Kontak dengan banjir",
   "Kontak sungai/danau (mencuci, mandi, pekerjaan)",
   "Sawah/perkebunan tanpa alas kaki",
@@ -80,499 +54,336 @@ const PAPARAN = [
   "Hobi/olahraga/wisata (berenang, memancing, arung jeram, dll.)",
 ];
 
-const prov = document.getElementById('prov');
-const kab = document.getElementById('kab');
-const fProv = document.getElementById('fProv');
-const fKab = document.getElementById('fKab');
-const fStart = document.getElementById('fStart');
-const fEnd = document.getElementById('fEnd');
+const prov=document.getElementById('prov'); const kab=document.getElementById('kab');
+const fProv=document.getElementById('fProv'); const fKab=document.getElementById('fKab');
+const fStart=document.getElementById('fStart'); const fEnd=document.getElementById('fEnd');
 
 function initProvKab(){
-  const provs = Object.keys(PROV_KAB).sort();
-  const addOpts = (sel, items, withAll=false)=>{
-    sel.innerHTML = "";
-    if(withAll){ sel.append(new Option("Semua", "")); }
-    sel.append(new Option("Pilih...", ""));
-    items.forEach(x => sel.append(new Option(x, x)));
-  };
-  addOpts(prov, provs, false);
-  addOpts(fProv, provs, true);
-  const updateKab = (selKab, provName, withAll=false)=>{
-    selKab.innerHTML = "";
-    if(withAll){ selKab.append(new Option("Semua", "")); }
-    if(!provName || !PROV_KAB[provName]){ selKab.append(new Option("Pilih provinsi dulu", "")); return; }
-    PROV_KAB[provName].forEach(x => selKab.append(new Option(x, x)));
-  };
-  prov.addEventListener('change', ()=> updateKab(kab, prov.value, false));
-  fProv.addEventListener('change', ()=> updateKab(fKab, fProv.value, true));
-  updateKab(kab, prov.value, false);
-  updateKab(fKab, fProv.value, true);
+  const provs=Object.keys(PROV_KAB).sort();
+  const addOpts=(sel,items,withAll=false)=>{ sel.innerHTML=""; if(withAll) sel.append(new Option("Semua","")); sel.append(new Option("Pilih...","")); items.forEach(x=>sel.append(new Option(x,x))); };
+  addOpts(prov,provs,false); addOpts(fProv,provs,true);
+  const updateKab=(selKab,provName,withAll=false)=>{ selKab.innerHTML=""; if(withAll) selKab.append(new Option("Semua","")); if(!provName||!PROV_KAB[provName]){ selKab.append(new Option("Pilih provinsi dulu","")); return; } PROV_KAB[provName].forEach(x=>selKab.append(new Option(x,x))); };
+  prov.addEventListener('change', ()=>updateKab(kab,prov.value,false));
+  fProv.addEventListener('change', ()=>updateKab(fKab,fProv.value,true));
+  updateKab(kab,prov.value,false); updateKab(fKab,fProv.value,true);
 }
 
+// =====================
+// RIWAYAT GEJALA (FIX: tanggal pasti muncul saat dicentang)
+// =====================
 function initGejalaChecklist(){
-  const grid = document.getElementById('gejalaGrid');
+  const grid=document.getElementById('gejalaGrid');
+  grid.innerHTML=''; // guard if re-init
+  const today=new Date().toISOString().slice(0,10);
   GEJALA.forEach(g=>{
-    const wrap = document.createElement('div');
-    wrap.className = "symptom";
-    wrap.innerHTML = `
+    const wrap=document.createElement('div');
+    wrap.className="symptom";
+    wrap.innerHTML=`
       <input type="checkbox" id="g_${g.id}" data-symptom="${g.id}">
-      <label for="g_${g.id}" style="margin:0; font-weight:500">${g.label}</label>
-      <input type="date" id="d_${g.id}" class="hidden">
+      <label for="g_${g.id}" style="margin:0;font-weight:500">${g.label}</label>
+      <input type="date" id="d_${g.id}" style="display:none" max="${today}">
     `;
     grid.appendChild(wrap);
-    const cb = wrap.querySelector('input[type=checkbox]');
-    const dt = wrap.querySelector('input[type=date]');
-    cb.addEventListener('change', ()=>{ dt.cexcellassList.toggle('hidden', !cb.checked); updateOnset(); updateDefinisiBadge(); });
+    const cb=wrap.querySelector('input[type=checkbox]');
+    const dt=wrap.querySelector('input[type=date]');
+    // tampilkan/hilangkan date dengan gaya inline (tidak bergantung CSS .hidden)
+    const toggle=()=>{ dt.style.display = cb.checked ? '' : 'none'; dt.required = cb.checked; if(cb.checked && !dt.value) dt.value=today; updateOnset(); updateDefinisiBadge(); };
+    cb.addEventListener('change', toggle);
     dt.addEventListener('change', ()=>{ updateOnset(); updateDefinisiBadge(); });
   });
 }
 initGejalaChecklist();
 
+// =====================
+// PAPARAN
+// =====================
 function initPaparanChecklist(){
-  const grid = document.getElementById('paparanGrid');
-  PAPARAN.forEach((p, idx)=>{
-    const wrap = document.createElement('div');
-    wrap.className = "symptom";
-    const id = 'p_'+idx;
-    wrap.innerHTML = `
-      <input type="checkbox" id="${id}">
-      <label for="${id}" style="margin:0; font-weight:500">${p}</label>
-    `;
+  const grid=document.getElementById('paparanGrid'); grid.innerHTML='';
+  PAPARAN.forEach((p,idx)=>{
+    const wrap=document.createElement('div'); wrap.className="symptom";
+    const id='p_'+idx;
+    wrap.innerHTML=`<input type="checkbox" id="${id}"><label for="${id}" style="margin:0;font-weight:500">${p}</label>`;
     grid.appendChild(wrap);
     wrap.querySelector('input[type=checkbox]').addEventListener('change', updateDefinisiBadge);
   });
 }
 initPaparanChecklist();
 
+// =====================
+// ONSET & DEFINISI KASUS
+// =====================
 function getOnsetDate(){
-  let earliest = null;
+  let earliest=null;
   GEJALA.forEach(g=>{
-    const cb = document.getElementById('g_'+g.id);
-    const dt = document.getElementById('d_'+g.id);
-    if(cb.checked && dt.value){
-      const d = new Date(dt.value);
-      if(!earliest || d < earliest) earliest = d;
+    const cb=document.getElementById('g_'+g.id);
+    const dt=document.getElementById('d_'+g.id);
+    if(cb && cb.checked && dt && dt.value){
+      const d=new Date(dt.value);
+      if(!earliest || d<earliest) earliest=d;
     }
   });
   return earliest;
 }
-function updateOnset(){
-  const onset = getOnsetDate();
-  document.getElementById('onsetTag').textContent = onset ? onset.toISOString().slice(0,10) : "—";
-}
+function updateOnset(){ const onset=getOnsetDate(); document.getElementById('onsetTag').textContent = onset ? onset.toISOString().slice(0,10) : "—"; }
 
 function getRadio(name){ return (document.querySelector('input[name="'+name+'"]:checked')?.value)||''; }
 function computeDefinisi(){
-  const S = {}; GEJALA.forEach(g=>{ S[g.id] = document.getElementById('g_'+g.id).checked; });
-  const anyExposure = PAPARAN.some((_,idx)=> document.getElementById('p_'+idx).checked );
-  const leuk = parseFloat(document.getElementById('leukosit').value);
-  const trom = parseFloat(document.getElementById('trombosit').value);
-  const bili = parseFloat(document.getElementById('bilirubin').value);
-  const amil = parseFloat(document.getElementById('amilase').value);
-  const cpk  = parseFloat(document.getElementById('cpk').value);
-  const proteinuria = document.getElementById('proteinuria').checked;
-  const hematuria   = document.getElementById('hematuria').checked;
-  const rdt = getRadio('rdt'), mat = getRadio('mat'), pcr = getRadio('pcr');
-  const hasFever = !!S.demam;
-  const supportMinor = (S.mialgia || S.malaise || S.conj);
-  const suspek = hasFever && supportMinor && anyExposure;
-  const severeList = [S.nyeriBetis, S.jaundice, S.anuria, S.perdarahan, S.sesak, S.aritmia, S.batuk, S.ruam];
-  const severeCount = severeList.filter(Boolean).length;
-  const crit1 = suspek && severeCount >= 2;
-  const crit2 = (rdt === 'pos');
-  const labA = (!isNaN(trom) && trom < 100);
-  const labB = (!isNaN(leuk) && (leuk < 3.5 || leuk > 10.5));
-  const labC = ((!isNaN(bili) && bili > 2) || (!isNaN(amil) && amil > 110) || (!isNaN(cpk) && cpk > 200));
-  const labD = (proteinuria || hematuria);
-  const labCount = [labA, labB, labC, labD].filter(Boolean).length;
-  const crit3 = suspek && labCount >= 3;
-  const probable = (crit1 || crit2 || crit3);
-  const confirmed = ((suspek || probable) && (mat === 'pos' || pcr === 'pos'));
-  let def = "Tidak memenuhi";
-  if(confirmed) def = "Confirm";
-  else if(probable) def = "Probable";
-  else if(suspek) def = "Suspek";
-  return def;
+  const S={}; GEJALA.forEach(g=>{ S[g.id]=document.getElementById('g_'+g.id)?.checked; });
+  const anyExposure = PAPARAN.some((_,idx)=> document.getElementById('p_'+idx)?.checked );
+  const leuk=parseFloat(document.getElementById('leukosit').value);
+  const trom=parseFloat(document.getElementById('trombosit').value);
+  const bili=parseFloat(document.getElementById('bilirubin').value);
+  const amil=parseFloat(document.getElementById('amilase').value);
+  const cpk =parseFloat(document.getElementById('cpk').value);
+  const proteinuria=document.getElementById('proteinuria').checked;
+  const hematuria=document.getElementById('hematuria').checked;
+  const rdt=getRadio('rdt'), mat=getRadio('mat'), pcr=getRadio('pcr');
+  const hasFever=!!S.demam; const supportMinor=(S.mialgia||S.malaise||S.conj); const suspek=hasFever&&supportMinor&&anyExposure;
+  const severeList=[S.nyeriBetis,S.jaundice,S.anuria,S.perdarahan,S.sesak,S.aritmia,S.batuk,S.ruam];
+  const severeCount=severeList.filter(Boolean).length;
+  const crit1=suspek && severeCount>=2;
+  const crit2=(rdt==='pos');
+  const labA=(!isNaN(trom)&&trom<100);
+  const labB=(!isNaN(leuk)&&(leuk<3.5||leuk>10.5));
+  const labC=((!isNaN(bili)&&bili>2)||(!isNaN(amil)&&amil>110)||(!isNaN(cpk)&&cpk>200));
+  const labD=(proteinuria||hematuria);
+  const labCount=[labA,labB,labC,labD].filter(Boolean).length;
+  const crit3=suspek && labCount>=3;
+  const probable=(crit1||crit2||crit3);
+  const confirmed=((suspek||probable)&&(mat==='pos'||pcr==='pos'));
+  let def="Tidak memenuhi"; if(confirmed) def="Confirm"; else if(probable) def="Probable"; else if(suspek) def="Suspek"; return def;
 }
 function updateDefinisiBadge(){
-  const def = computeDefinisi();
-  const badge = document.getElementById('defBadge');
-  badge.textContent = "Definisi Kasus: " + def;
-  badge.classList.remove('ok','warn','bad','neutral');
-  let cls = 'neutral';
-  if(def === 'Confirm') cls = 'ok';
-  else if(def === 'Probable') cls = 'warn';
-  else if(def === 'Suspek') cls = 'neutral';
-  else cls = 'bad';
-  badge.classList.add(cls);
+  const def=computeDefinisi(); const badge=document.getElementById('defBadge');
+  badge.textContent="Definisi Kasus: "+def; badge.className='badge';
+  if(def==='Confirm') badge.classList.add('ok');
+  else if(def==='Probable') badge.classList.add('warn');
+  else if(def==='Suspek') badge.classList.add('neutral');
+  else badge.classList.add('bad');
 }
+// Tandai abnormal
 ['leukosit','trombosit','bilirubin','sgot','sgpt','kreatinin','amilase','cpk'].forEach(id=>{
-  const el = document.getElementById(id);
+  const el=document.getElementById(id);
   el && el.addEventListener('input', ()=>{
-    const v = parseFloat(el.value); let abn=false;
+    const v=parseFloat(el.value); let abn=false;
     switch(id){
-      case 'leukosit': abn = !isNaN(v) && (v<3.5 || v>10.5); break;
-      case 'trombosit': abn = !isNaN(v) && (v<150 || v>450); break;
-      case 'bilirubin': abn = !isNaN(v) && (v>1.2); break;
-      case 'sgot': abn = !isNaN(v) && (v>40); break;
-      case 'sgpt': abn = !isNaN(v) && (v>41); break;
-      case 'kreatinin': abn = !isNaN(v) && (v<0.6 || v>1.3); break;
-      case 'amilase': abn = !isNaN(v) && (v>110); break;
-      case 'cpk': abn = !isNaN(v) && (v>200); break;
+      case 'leukosit': abn=!isNaN(v)&&(v<3.5||v>10.5); break;
+      case 'trombosit': abn=!isNaN(v)&&(v<150||v>450); break;
+      case 'bilirubin': abn=!isNaN(v)&&(v>1.2); break;
+      case 'sgot': abn=!isNaN(v)&&(v>40); break;
+      case 'sgpt': abn=!isNaN(v)&&(v>41); break;
+      case 'kreatinin': abn=!isNaN(v)&&(v<0.6||v>1.3); break;
+      case 'amilase': abn=!isNaN(v)&&(v>110); break;
+      case 'cpk': abn=!isNaN(v)&&(v>200); break;
     }
     el.classList.toggle('abn', abn);
     updateDefinisiBadge();
   });
 });
 
+// =====================
+// CRUD DATA
+// =====================
 function norm(s){ return (s||"").toString().trim().toLowerCase().replace(/\s+/g,' '); }
 function getFormData(){
-  const onsetDate = getOnsetDate();
-  const gejala = {}; const gejalaTgl = {};
-  GEJALA.forEach(g=>{
-    gejala[g.label] = document.getElementById('g_'+g.id).checked;
-    const d = document.getElementById('d_'+g.id).value || "";
-    gejalaTgl[g.label] = d;
-  });
-  const paparan = PAPARAN.map((p,idx)=> ({label:p, checked: document.getElementById('p_'+idx).checked}));
-  const data = {
-    nama: document.getElementById('nama').value,
-    jk: document.getElementById('jk').value,
-    umur: document.getElementById('umur').value,
-    kerja: document.getElementById('kerja').value,
-    prov: document.getElementById('prov').value,
-    kab: document.getElementById('kab').value,
-    alamat: document.getElementById('alamat').value,
+  const onsetDate=getOnsetDate();
+  const gejala={}; const gejalaTgl={};
+  GEJALA.forEach(g=>{ gejala[g.label]=document.getElementById('g_'+g.id).checked; gejalaTgl[g.label]=(document.getElementById('d_'+g.id).value||""); });
+  const paparan=PAPARAN.map((p,idx)=>({label:p,checked:document.getElementById('p_'+idx).checked}));
+  return {
+    nama:document.getElementById('nama').value,
+    jk:document.getElementById('jk').value,
+    umur:document.getElementById('umur').value,
+    kerja:document.getElementById('kerja').value,
+    prov:document.getElementById('prov').value,
+    kab:document.getElementById('kab').value,
+    alamat:document.getElementById('alamat').value,
     gejala, gejalaTgl,
     onset: onsetDate ? onsetDate.toISOString().slice(0,10) : "",
-    tglPaparan: document.getElementById('tglPaparan').value,
+    tglPaparan:document.getElementById('tglPaparan').value,
     paparan,
-    lab: {
-      leukosit: document.getElementById('leukosit').value,
-      trombosit: document.getElementById('trombosit').value,
-      bilirubin: document.getElementById('bilirubin').value,
-      sgot: document.getElementById('sgot').value,
-      sgpt: document.getElementById('sgpt').value,
-      kreatinin: document.getElementById('kreatinin').value,
-      rdt: getRadio('rdt'),
-      mat: getRadio('mat'),
-      serovar: document.getElementById('serovar').value,
-      amilase: document.getElementById('amilase').value,
-      cpk: document.getElementById('cpk').value,
-      proteinuria: document.getElementById('proteinuria').checked,
-      hematuria: document.getElementById('hematuria').checked,
-      pcr: getRadio('pcr'),
+    lab:{
+      leukosit:document.getElementById('leukosit').value,
+      trombosit:document.getElementById('trombosit').value,
+      bilirubin:document.getElementById('bilirubin').value,
+      sgot:document.getElementById('sgot').value,
+      sgpt:document.getElementById('sgpt').value,
+      kreatinin:document.getElementById('kreatinin').value,
+      rdt:getRadio('rdt'),
+      mat:getRadio('mat'),
+      serovar:document.getElementById('serovar').value,
+      amilase:document.getElementById('amilase').value,
+      cpk:document.getElementById('cpk').value,
+      proteinuria:document.getElementById('proteinuria').checked,
+      hematuria:document.getElementById('hematuria').checked,
+      pcr:getRadio('pcr'),
     },
-    statusAkhir: document.getElementById('statusAkhir').value,
-    tglStatus: document.getElementById('tglStatus').value,
-    obat: document.getElementById('obat').value,
-    definisi: computeDefinisi(),
-    savedAt: new Date().toISOString()
+    statusAkhir:document.getElementById('statusAkhir').value,
+    tglStatus:document.getElementById('tglStatus').value,
+    obat:document.getElementById('obat').value,
+    definisi:computeDefinisi(),
+    savedAt:new Date().toISOString()
   };
-  return data;
 }
 function resetForm(){
-  document.querySelectorAll('input, select, textarea').forEach(el=>{
-    if(el.type === 'checkbox' || el.type === 'radio') el.checked = false;
-    else el.value = '';
-  });
-  initProvKab();
-  updateOnset();
-  updateDefinisiBadge();
+  document.querySelectorAll('input,select,textarea').forEach(el=>{ if(el.type==='checkbox'||el.type==='radio') el.checked=false; else el.value=''; });
+  initProvKab(); initGejalaChecklist(); initPaparanChecklist();
+  updateOnset(); updateDefinisiBadge();
 }
-document.getElementById('reset').addEventListener('click', (e)=>{ e.preventDefault(); resetForm(); });
+document.getElementById('reset').addEventListener('click', e=>{ e.preventDefault(); resetForm(); });
 
-function loadCases(){ try{ return JSON.parse(localStorage.getItem('lepto_cases') || '[]'); }catch(e){ return []; } }
+function loadCases(){ try{return JSON.parse(localStorage.getItem('lepto_cases')||'[]');}catch(e){return[]} }
 function saveCases(arr){ localStorage.setItem('lepto_cases', JSON.stringify(arr)); }
 
 function renderCounts(){
-  const data = loadCases();
-  const counts = {Suspek:0, Probable:0, Confirm:0, Other:0};
-  data.forEach(d=>{
-    if(d.definisi === 'Suspek') counts.Suspek++;
-    else if(d.definisi === 'Probable') counts.Probable++;
-    else if(d.definisi === 'Confirm') counts.Confirm++;
-    else counts.Other++;
-  });
-  const box = document.getElementById('counts'); box.innerHTML='';
-  Object.entries(counts).forEach(([k,v])=>{
-    const span = document.createElement('span');
-    const cls = k==='Confirm' ? 'ok' : (k==='Probable' ? 'warn' : (k==='Suspek' ? '' : 'bad'));
-    span.className = 'tag '+cls; span.textContent = k+': '+v; box.appendChild(span);
-  });
+  const data=loadCases(); const counts={Suspek:0,Probable:0,Confirm:0,Other:0};
+  data.forEach(d=>{ if(d.definisi==='Suspek') counts.Suspek++; else if(d.definisi==='Probable') counts.Probable++; else if(d.definisi==='Confirm') counts.Confirm++; else counts.Other++; });
+  const box=document.getElementById('counts'); box.innerHTML='';
+  Object.entries(counts).forEach(([k,v])=>{ const span=document.createElement('span'); const cls=k==='Confirm'?'ok':(k==='Probable'?'warn':(k==='Suspek'?'':'bad')); span.className='tag '+cls; span.textContent=`${k}: ${v}`; box.appendChild(span); });
 }
 function defClass(def){ if(def==='Confirm') return 'ok'; if(def==='Probable') return 'warn'; if(def==='Suspek') return ''; return 'bad'; }
 function renderTable(){
-  const tbody = document.querySelector('#casesTable tbody'); tbody.innerHTML='';
-  const data = loadCases();
-  data.forEach((d, idx)=>{
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${d.nama}</td>
-      <td>${d.umur}</td>
-      <td>${d.prov}</td>
-      <td>${d.kab}</td>
-      <td>${d.onset || '-'}</td>
-      <td><span class="tag ${defClass(d.definisi)}">${d.definisi}</span></td>
-      <td>${d.statusAkhir || '-'}</td>
-      <td><button class="btn small" data-del="${idx}">Hapus</button></td>
-    `;
+  const tbody=document.querySelector('#casesTable tbody'); tbody.innerHTML='';
+  const data=loadCases();
+  data.forEach((d,i)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td>${d.nama}</td><td>${d.umur}</td><td>${d.prov}</td><td>${d.kab}</td>
+      <td>${d.onset||'-'}</td><td><span class="tag ${defClass(d.definisi)}">${d.definisi}</span></td>
+      <td>${d.statusAkhir||'-'}</td><td><button class="btn small" data-del="${i}">Hapus</button></td>`;
     tbody.appendChild(tr);
   });
   tbody.querySelectorAll('button[data-del]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      const i = parseInt(btn.getAttribute('data-del'), 10);
-      const arr = loadCases(); arr.splice(i,1); saveCases(arr);
-      renderTable(); renderCounts(); updateCharts(); recalcCasesFromLocalAndRefresh();
-    });
+    btn.addEventListener('click', ()=>{ const i=+btn.dataset.del; const arr=loadCases(); arr.splice(i,1); saveCases(arr); renderTable(); renderCounts(); updateCharts(); recalcCasesFromLocalAndRefresh(); });
   });
 }
-document.getElementById('simpan').addEventListener('click', (e)=>{
+document.getElementById('simpan').addEventListener('click', e=>{
   e.preventDefault();
-  const data = getFormData();
+  const data=getFormData();
   if(!data.nama){ alert('Nama wajib diisi.'); return; }
-  if(!data.prov || !data.kab){ alert('Provinsi dan Kabupaten/Kota wajib dipilih.'); return; }
-  const arr = loadCases(); arr.push(data); saveCases(arr);
+  if(!data.prov||!data.kab){ alert('Provinsi dan Kabupaten/Kota wajib dipilih.'); return; }
+  const arr=loadCases(); arr.push(data); saveCases(arr);
   renderTable(); renderCounts(); updateCharts(); recalcCasesFromLocalAndRefresh();
-  // >>> Tambahkan baris ini untuk kirim 1 baris ke Sheets <<<
-  sendRowToSheets(flattenCase(data));
+  if(typeof sendRowToSheets==='function'){ try{ sendRowToSheets(flattenCase(data)); }catch(_e){} }
   alert('Kasus disimpan.');
-document.getElementById('syncSheets')?.addEventListener('click', sendAllToSheets);
 });
-function duplicateKey(d){ return [norm(d.nama), norm(d.umur), norm(d.alamat), d.onset || ''].join('|'); }
+function duplicateKey(d){ return [norm(d.nama),norm(d.umur),norm(d.alamat),d.onset||''].join('|'); }
 document.getElementById('cekDup').addEventListener('click', ()=>{
-  const arr = loadCases(); const seen = {}; const dups = new Set();
-  arr.forEach((d,i)=>{ const k = duplicateKey(d); if(seen[k]!==undefined){dups.add(i); dups.add(seen[k]);} else {seen[k]=i;} });
-  const rows = document.querySelectorAll('#casesTable tbody tr');
-  rows.forEach((tr,i)=> tr.classList.toggle('dup', dups.has(i)));
-  alert(dups.size ? 'Duplikat ditemukan & ditandai warna krem.' : 'Tidak ada duplikat.');
+  const arr=loadCases(); const seen={}; const dups=new Set();
+  arr.forEach((d,i)=>{ const k=duplicateKey(d); if(seen[k]!==undefined){ dups.add(i); dups.add(seen[k]); } else { seen[k]=i; } });
+  const rows=document.querySelectorAll('#casesTable tbody tr');
+  rows.forEach((tr,i)=>tr.classList.toggle('dup', dups.has(i)));
+  alert(duplikatMsg=dups.size?'Duplikat ditemukan & ditandai warna krem.':'Tidak ada duplikat.');
 });
 document.getElementById('hapusDup').addEventListener('click', ()=>{
-  const arr = loadCases(); const seen = {}; const result = [];
-  arr.forEach(d=>{ const k = duplicateKey(d); if(!(k in seen)){ seen[k]=true; result.push(d); } });
-  const removed = arr.length - result.length; saveCases(result);
+  const arr=loadCases(); const seen={}; const result=[];
+  arr.forEach(d=>{ const k=duplicateKey(d); if(!(k in seen)){ seen[k]=true; result.push(d); } });
+  const removed=arr.length-result.length; saveCases(result);
   renderTable(); renderCounts(); updateCharts(); recalcCasesFromLocalAndRefresh();
-  alert(removed>0 ? ('Menghapus '+removed+' duplikat.') : 'Tidak ada duplikat untuk dihapus.');
+  alert(removed>0?('Menghapus '+removed+' duplikat.'):'Tidak ada duplikat untuk dihapus.');
 });
 
+// =====================
+// CHARTS
+// =====================
 let trendChart, kabChart;
 function ensureCharts(){
-  const ctx1 = document.getElementById('trendChart').getContext('2d');
-  const ctx2 = document.getElementById('kabChart').getContext('2d');
-  if(!trendChart){
-    trendChart = new Chart(ctx1, { type:'line', data:{labels:[], datasets:[{label:'Kasus / bulan', data:[]}]},
-      options:{ responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}} } });
-  }
-  if(!kabChart){
-    kabChart = new Chart(ctx2, { type:'bar', data:{labels:[], datasets:[{label:'Kasus / kabupaten-kota', data:[]}]},
-      options:{ responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}} } });
-  }
+  const ctx1=document.getElementById('trendChart').getContext('2d');
+  const ctx2=document.getElementById('kabChart').getContext('2d');
+  if(!trendChart){ trendChart=new Chart(ctx1,{type:'line',data:{labels:[],datasets:[{label:'Kasus / bulan',data:[]}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}}); }
+  if(!kabChart){ kabChart=new Chart(ctx2,{type:'bar',data:{labels:[],datasets:[{label:'Kasus / kabupaten-kota',data:[]}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}}); }
 }
 ensureCharts();
 function monthKey(d){ return d.slice(0,7); }
-function withinRange(d, start, end){
-  const m = monthKey(d);
-  if(start && m < start) return false;
-  if(end && m > end) return false;
-  return true;
-}
+function withinRange(d,start,end){ const m=monthKey(d); if(start&&m<start) return false; if(end&&m>end) return false; return true; }
 function updateCharts(){
-  const arr = loadCases();
-  const fp = fProv.value || ""; const fk = fKab.value || ""; const ms = fStart.value || ""; const me = fEnd.value || "";
-  const filtered = arr.filter(d=>{ if(fp && d.prov !== fp) return false; if(fk && d.kab !== fk) return false; if(d.onset){ if(!withinRange(d.onset, ms, me)) return false; } return true; });
-  const perMonth = {}; filtered.forEach(d=>{ if(!d.onset) return; const m = monthKey(d.onset); perMonth[m]=(perMonth[m]||0)+1; });
-  const mKeys = Object.keys(perMonth).sort(); trendChart.data.labels=mKeys; trendChart.data.datasets[0].data = mKeys.map(k=>perMonth[k]||0); trendChart.update();
-  const perKab = {}; filtered.forEach(d=>{ const kk=d.kab || '(Tidak diisi)'; perKab[kk]=(perKab[kk]||0)+1; });
-  const kLabels = Object.keys(perKab).sort(); kabChart.data.labels=kLabels; kabChart.data.datasets[0].data = kLabels.map(k=>perKab[k]||0); kabChart.update();
+  const arr=loadCases(); const fp=fProv.value||""; const fk=fKab.value||""; const ms=fStart.value||""; const me=fEnd.value||"";
+  const filtered=arr.filter(d=>{ if(fp&&d.prov!==fp) return false; if(fk&&d.kab!==fk) return false; if(d.onset && !withinRange(d.onset,ms,me)) return false; return true; });
+  const perMonth={}; filtered.forEach(d=>{ if(!d.onset) return; const m=monthKey(d.onset); perMonth[m]=(perMonth[m]||0)+1; });
+  const mKeys=Object.keys(perMonth).sort(); trendChart.data.labels=mKeys; trendChart.data.datasets[0].data=mKeys.map(k=>perMonth[k]||0); trendChart.update();
+  const perKab={}; filtered.forEach(d=>{ const kk=d.kab||'(Tidak diisi)'; perKab[kk]=(perKab[kk]||0)+1; });
+  const kLabels=Object.keys(perKab).sort(); kabChart.data.labels=kLabels; kabChart.data.datasets[0].data=kLabels.map(k=>perKab[k]||0); kabChart.update();
 }
 document.getElementById('applyFilter').addEventListener('click', updateCharts);
 
-// Peta choropleth (white background)
-function getColor(val){
-  const v = Number(val)||0;
-  if(v === 0) return '#ffffff';
-  if(v > 0 && v <= 50) return '#ffc4c4';
-  if(v > 50 && v <= 200) return '#ff7a7a';
-  return '#cc0000';
-}
+// =====================
+// PETA CHOROPLETH
+// =====================
+function getColor(val){ const v=Number(val)||0; if(v===0) return '#ffffff'; if(v>0&&v<=50) return '#ffc4c4'; if(v>50&&v<=200) return '#ff7a7a'; return '#cc0000'; }
 let map, geojsonLayer; let _labels=[];
-function ensureMap(){
-  if(map) return map;
-  map = L.map('map', { zoomControl: true, attributionControl: false });
-  return map;
-}
-let casesByProvince = {
-  "Aceh": 12, "Sumatera Utara": 28, "Sumatera Barat": 8, "Riau": 15, "Jambi": 5, "Sumatera Selatan": 31,
-  "Bengkulu": 2, "Lampung": 44, "Kepulauan Bangka Belitung": 1, "Kepulauan Riau": 3, "DKI Jakarta": 320,
-  "Jawa Barat": 188, "Jawa Tengah": 96, "DI Yogyakarta": 45, "Jawa Timur": 210, "Banten": 74, "Bali": 12,
-  "Nusa Tenggara Barat": 9, "Nusa Tenggara Timur": 20, "Kalimantan Barat": 6, "Kalimantan Tengah": 4,
-  "Kalimantan Selatan": 11, "Kalimantan Timur": 7, "Kalimantan Utara": 1, "Sulawesi Utara": 5, "Sulawesi Tengah": 6,
-  "Sulawesi Selatan": 130, "Sulawesi Tenggara": 4, "Gorontalo": 1, "Sulawesi Barat": 2, "Maluku": 1,
-  "Maluku Utara": 1, "Papua Barat": 1, "Papua": 2, "Papua Selatan": 0, "Papua Tengah": 0, "Papua Pegunungan": 0
-};
-function totalNational(){ return Object.values(casesByProvince).reduce((a,b)=>a+(+b||0), 0); }
-function getProvName(props){
-  return props?.provinsi || props?.Provinsi || props?.PROVINSI || props?.NAME_1 || props?.Name ||
-         props?.WADMPR || props?.wadmpr || props?.WADMPRV || props?.nama || props?.name || '';
-}
-function styleFeature(feat){
-  const prov = getProvName(feat.properties||{});
-  const val = +casesByProvince[prov] || 0;
-  return { weight:1, color:'#9ca3af', fillColor:getColor(val), fillOpacity:0.8 };
-}
-function highlightFeature(e){ e.target.setStyle({ weight:2, fillOpacity:0.9, color:'#6b7280' }); e.target.bringToFront?.(); }
+function ensureMap(){ if(map) return map; map=L.map('map',{zoomControl:true,attributionControl:false}); return map; }
+let casesByProvince={"Aceh":12,"Sumatera Utara":28,"Sumatera Barat":8,"Riau":15,"Jambi":5,"Sumatera Selatan":31,"Bengkulu":2,"Lampung":44,"Kepulauan Bangka Belitung":1,"Kepulauan Riau":3,"DKI Jakarta":320,"Jawa Barat":188,"Jawa Tengah":96,"DI Yogyakarta":45,"Jawa Timur":210,"Banten":74,"Bali":12,"Nusa Tenggara Barat":9,"Nusa Tenggara Timur":20,"Kalimantan Barat":6,"Kalimantan Tengah":4,"Kalimantan Selatan":11,"Kalimantan Timur":7,"Kalimantan Utara":1,"Sulawesi Utara":5,"Sulawesi Tengah":6,"Sulawesi Selatan":130,"Sulawesi Tenggara":4,"Gorontalo":1,"Sulawesi Barat":2,"Maluku":1,"Maluku Utara":1,"Papua Barat":1,"Papua":2,"Papua Selatan":0,"Papua Tengah":0,"Papua Pegunungan":0};
+function totalNational(){ return Object.values(casesByProvince).reduce((a,b)=>a+(+b||0),0); }
+function getProvName(props){ return props?.provinsi||props?.Provinsi||props?.PROVINSI||props?.NAME_1||props?.Name||props?.WADMPR||props?.wadmpr||props?.WADMPRV||props?.nama||props?.name||''; }
+function styleFeature(feat){ const prov=getProvName(feat.properties||{}); const val=+casesByProvince[prov]||0; return {weight:1,color:'#9ca3af',fillColor:getColor(val),fillOpacity:0.8}; }
+function highlightFeature(e){ e.target.setStyle({weight:2,fillOpacity:0.9,color:'#6b7280'}); e.target.bringToFront?.(); }
 function resetHighlight(e){ geojsonLayer && geojsonLayer.resetStyle(e.target); }
 function onEachFeature(feature, layer){
-  const prov = getProvName(feature.properties||{});
-  const val = +casesByProvince[prov] || 0;
-  if(prov && !(prov in casesByProvince)){
-    console.warn('⚠️ Nama provinsi pada GeoJSON tidak cocok dengan key casesByProvince:', prov);
-  }
-  const pct = totalNational() ? ((val/totalNational())*100).toFixed(1) : '0.0';
-  layer.bindTooltip(`${prov||'(tanpa nama)'}: ${val.toLocaleString('id-ID')} kasus`, {sticky:true});
-  layer.on({ mouseover:highlightFeature, mouseout:resetHighlight, click:()=>{
-    layer.bindPopup(`<b>${prov||'(tanpa nama)'}</b><br>Kasus: ${val.toLocaleString('id-ID')}<br>Kontribusi nasional: ${pct}%`).openPopup();
-  }});
+  const prov=getProvName(feature.properties||{}); const val=+casesByProvince[prov]||0;
+  if(prov && !(prov in casesByProvince)) console.warn('⚠️ Nama provinsi pada GeoJSON tidak cocok dengan key casesByProvince:', prov);
+  const pct=totalNational()?((val/totalNational())*100).toFixed(1):'0.0';
+  layer.bindTooltip(`${prov||'(tanpa nama)'}: ${val.toLocaleString('id-ID')} kasus`,{sticky:true});
+  layer.on({mouseover:highlightFeature,mouseout:resetHighlight,click:()=>{ layer.bindPopup(`<b>${prov||'(tanpa nama)'}</b><br>Kasus: ${val.toLocaleString('id-ID')}<br>Kontribusi nasional: ${pct}%`).openPopup(); }});
 }
 function addCenterLabels(){
-  if(!map || !geojsonLayer) return;
-  _labels.forEach(l=> map.removeLayer(l)); _labels = [];
-  geojsonLayer.eachLayer(function(layer){
-    const prov = getProvName(layer.feature?.properties||{});
-    const val = +casesByProvince[prov] || 0;
-    if(val > 0){
-      const c = layer.getBounds().getCenter();
-      const t = L.tooltip({ permanent:true, direction:'center', className:'prov-label' })
-                  .setContent(String(val)).setLatLng(c);
-      _labels.push(t); t.addTo(map);
-    }
+  if(!map||!geojsonLayer) return;
+  _labels.forEach(l=>map.removeLayer(l)); _labels=[];
+  geojsonLayer.eachLayer(layer=>{
+    const prov=getProvName(layer.feature?.properties||{}); const val=+casesByProvince[prov]||0;
+    if(val>0){ const c=layer.getBounds().getCenter(); const t=L.tooltip({permanent:true,direction:'center',className:'prov-label'}).setContent(String(val)).setLatLng(c); _labels.push(t); t.addTo(map); }
   });
 }
-const legend = L.control({ position:'topright' });
-legend.onAdd = function(){
-  const div = L.DomUtil.create('div','legend');
-  div.innerHTML = '<div class="legend-title">Kategori Kasus</div>'+
-                  '<div class="legend-row"><span class="swatch" style="background:#ffffff"></span>0</div>'+
-                  '<div class="legend-row"><span class="swatch" style="background:#ffc4c4"></span>1–50</div>'+
-                  '<div class="legend-row"><span class="swatch" style="background:#ff7a7a"></span>50–200</div>'+
-                  '<div class="legend-row"><span class="swatch" style="background:#cc0000"></span>&gt;200</div>';
-  return div;
-};
+const legend=L.control({position:'topright'});
+legend.onAdd=function(){ const div=L.DomUtil.create('div','legend'); div.innerHTML='<div class="legend-title">Kategori Kasus</div>'+'<div class="legend-row"><span class="swatch" style="background:#ffffff"></span>0</div>'+'<div class="legend-row"><span class="swatch" style="background:#ffc4c4"></span>1–50</div>'+'<div class="legend-row"><span class="swatch" style="background:#ff7a7a"></span>50–200</div>'+'<div class="legend-row"><span class="swatch" style="background:#cc0000"></span>&gt;200</div>'; return div; };
 function refreshChoropleth(){ geojsonLayer && geojsonLayer.setStyle(styleFeature); addCenterLabels(); }
-async function loadFromUrl(url){
-  const res = await fetch(url, {mode:'cors'});
-  if(!res.ok) throw new Error('Gagal fetch GeoJSON: '+res.status);
-  return await res.json();
-}
-function renderChoropleth(geojson){
-  ensureMap();
-  if(geojsonLayer) map.removeLayer(geojsonLayer);
-  geojsonLayer = L.geoJSON(geojson, { style:styleFeature, onEachFeature:onEachFeature }).addTo(map);
-  try{ map.fitBounds(geojsonLayer.getBounds(), { padding:[10,10] }); }catch(_){}
-  if(!legend._map) legend.addTo(map);
-  addCenterLabels();
-}
-function exportPNG(){
-  if(!map){ alert('Peta belum dirender.'); return; }
-  leafletImage(map, function(err, canvas){
-    if(err){ alert('Gagal membuat gambar: '+err); return; }
-    const a = document.createElement('a');
-    a.download = 'choropleth.png';
-    a.href = canvas.toDataURL('image/png');
-    a.click();
-  });
-}
-function recalcCasesByProvinceFromLocal(){
-  const arr = loadCases();
-  const counts = {};
-  arr.forEach(d=>{
-    const p = d.prov || '(Tidak diisi)';
-    counts[p] = (counts[p]||0)+1;
-  });
-  return counts;
-}
-function recalcCasesFromLocalAndRefresh(){
-  const counts = recalcCasesByProvinceFromLocal();
-  if(Object.keys(counts).length){ casesByProvince = counts; refreshChoropleth(); }
-}
-const recalcBtn = document.getElementById('recalcMap');
-const exportPngBtn = document.getElementById('exportPng');
-recalcBtn?.addEventListener('click', ()=>{ recalcCasesFromLocalAndRefresh(); });
-exportPngBtn?.addEventListener('click', exportPNG);
-(async function initMap(){
-  ensureMap();
-  try{
-    const data = await loadFromUrl('https://raw.githubusercontent.com/agustddiction/Dashboard-Leptospirosis/main/data/provinsi.json');
-    renderChoropleth(data);
-    recalcCasesFromLocalAndRefresh();
-  }catch(err){ console.warn('Auto-load GeoJSON gagal:', err); }
-})();
-const _root = document.querySelector('main');
+async function loadFromUrl(url){ const res=await fetch(url,{mode:'cors'}); if(!res.ok) throw new Error('Gagal fetch GeoJSON: '+res.status); return await res.json(); }
+function renderChoropleth(geojson){ ensureMap(); if(geojsonLayer) map.removeLayer(geojsonLayer); geojsonLayer=L.geoJSON(geojson,{style:styleFeature,onEachFeature:onEachFeature}).addTo(map); try{ map.fitBounds(geojsonLayer.getBounds(),{padding:[10,10]}); }catch(_){} if(!legend._map) legend.addTo(map); addCenterLabels(); }
+function exportPNG(){ if(!map){ alert('Peta belum dirender.'); return; } leafletImage(map,(err,canvas)=>{ if(err){ alert('Gagal membuat gambar: '+err); return; } const a=document.createElement('a'); a.download='choropleth.png'; a.href=canvas.toDataURL('image/png'); a.click(); }); }
+function recalcCasesByProvinceFromLocal(){ const arr=loadCases(); const counts={}; arr.forEach(d=>{ const p=d.prov||'(Tidak diisi)'; counts[p]=(counts[p]||0)+1; }); return counts; }
+function recalcCasesFromLocalAndRefresh(){ const counts=recalcCasesByProvinceFromLocal(); if(Object.keys(counts).length){ casesByProvince=counts; refreshChoropleth(); } }
+document.getElementById('recalcMap')?.addEventListener('click', ()=>recalcCasesFromLocalAndRefresh());
+document.getElementById('exportPng')?.addEventListener('click', exportPNG);
+(async function initMap(){ ensureMap(); try{ const data=await loadFromUrl(DEFAULT_GH); renderChoropleth(data); recalcCasesFromLocalAndRefresh(); }catch(err){ console.warn('Auto-load GeoJSON gagal:',err); } })();
+
+// =====================
+// AUTO UPDATE
+// =====================
+const _root=document.querySelector('main');
 function _autoUpd(){ updateOnset(); updateDefinisiBadge(); }
 _root.addEventListener('input', _autoUpd, true);
 _root.addEventListener('change', _autoUpd, true);
-updateOnset();
-updateDefinisiBadge();
-renderTable();
-renderCounts();
-updateCharts();
+updateOnset(); updateDefinisiBadge(); renderTable(); renderCounts(); updateCharts();
+
+// =====================
+// EKSPOR EXCEL
+// =====================
 function flattenCase(d){
-  const row = {
-    'Nama': d.nama, 'Jenis Kelamin': d.jk, 'Umur': d.umur, 'Pekerjaan': d.kerja,
-    'Provinsi': d.prov, 'Kab/Kota': d.kab, 'Alamat': d.alamat,
-    'Onset': d.onset, 'Tanggal Paparan': d.tglPaparan, 'Definisi': d.definisi,
-    'Status Akhir': d.statusAkhir, 'Tanggal Status': d.tglStatus, 'Obat': d.obat, 'Saved At': d.savedAt
-  };
-  GEJALA.forEach(g=>{ const label=g.label; row['Gejala: '+label] = d.gejala[label] ? 'Ya' : ''; row['Tgl '+label] = d.gejalaTgl[label] || ''; });
-  row['Paparan (2 minggu)'] = (d.paparan||[]).filter(x=>x.checked).map(x=>x.label).join('; ');
-  const Lb = d.lab||{};
-  row['Leukosit (x10^3/µL)'] = Lb.leukosit||''; row['Trombosit (x10^3/µL)'] = Lb.trombosit||'';
-  row['Bilirubin (mg/dL)'] = Lb.bilirubin||''; row['SGOT (U/L)'] = Lb.sgot||''; row['SGPT (U/L)'] = Lb.sgpt||'';
-  row['Kreatinin (mg/dL)'] = Lb.kreatinin||''; row['Amilase (U/L)'] = Lb.amilase||''; row['CPK (U/L)'] = Lb.cpk||'';
-  row['Proteinuria'] = Lb.proteinuria ? 'Ya' : ''; row['Hematuria'] = Lb.hematuria ? 'Ya' : '';
-  const map3 = v => v==='pos'?'Positif':(v==='neg'?'Negatif':(v==='nd'?'Tidak diperiksa':''));
-  row['RDT'] = map3(Lb.rdt); row['MAT'] = map3(Lb.mat); row['PCR'] = map3(Lb.pcr); row['Serovar'] = Lb.serovar||'';
+  const row={ 'Nama':d.nama,'Jenis Kelamin':d.jk,'Umur':d.umur,'Pekerjaan':d.kerja,'Provinsi':d.prov,'Kab/Kota':d.kab,'Alamat':d.alamat,'Onset':d.onset,'Tanggal Paparan':d.tglPaparan,'Definisi':d.definisi,'Status Akhir':d.statusAkhir,'Tanggal Status':d.tglStatus,'Obat':d.obat,'Saved At':d.savedAt };
+  GEJALA.forEach(g=>{ const label=g.label; row['Gejala: '+label]=d.gejala[label]?'Ya':''; row['Tgl '+label]=d.gejalaTgl[label]||''; });
+  row['Paparan (2 minggu)']=(d.paparan||[]).filter(x=>x.checked).map(x=>x.label).join('; ');
+  const Lb=d.lab||{}; row['Leukosit (x10^3/µL)']=Lb.leukosit||''; row['Trombosit (x10^3/µL)']=Lb.trombosit||'';
+  row['Bilirubin (mg/dL)']=Lb.bilirubin||''; row['SGOT (U/L)']=Lb.sgot||''; row['SGPT (U/L)']=Lb.sgpt||''; row['Kreatinin (mg/dL)']=Lb.kreatinin||''; row['Amilase (U/L)']=Lb.amilase||''; row['CPK (U/L)']=Lb.cpk||'';
+  row['Proteinuria']=Lb.proteinuria?'Ya':''; row['Hematuria']=Lb.hematuria?'Ya':'';
+  const map3=v=>v==='pos'?'Positif':(v==='neg'?'Negatif':(v==='nd'?'Tidak diperiksa':''));
+  row['RDT']=map3(Lb.rdt); row['MAT']=map3(Lb.mat); row['PCR']=map3(Lb.pcr); row['Serovar']=Lb.serovar||'';
   return row;
 }
-function exportToExcel(){
-  const arr = loadCases(); if(arr.length===0){ alert('Tidak ada data untuk diekspor.'); return; }
-  const rows = arr.map(flattenCase); const ws = XLSX.utils.json_to_sheet(rows);
-  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Kasus');
-  XLSX.writeFile(wb, 'leptospirosis_cases.xlsx');
-}
+function exportToExcel(){ const arr=loadCases(); if(arr.length===0){ alert('Tidak ada data untuk diekspor.'); return; } const rows=arr.map(flattenCase); const ws=XLSX.utils.json_to_sheet(rows); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Kasus'); XLSX.writeFile(wb,'leptospirosis_cases.xlsx'); }
 document.getElementById('exportExcel').addEventListener('click', exportToExcel);
-async function sendRowToSheets(row){
-  if(!SHEETS_URL){ alert('SHEETS_URL belum diisi.'); return; }
-  try{
-    const res = await fetch(SHEETS_URL, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ token:'ZOOLEPTO123', action:'append', row })
-      // Jika kena CORS, ganti: mode:'no-cors' (tapi tidak bisa baca res)
-    });
-    // Optional: cek respons JSON (bisa saja diblokir CORS di beberapa setup)
-    // const j = await res.json(); console.log('Sheets:', j);
-  }catch(e){
-    console.warn('Gagal kirim ke Sheets:', e);
-  }
-}
 
-async function sendAllToSheets(){
-  const arr = loadCases();
-  if(!arr.length){ alert('Tidak ada data.'); return; }
-  if(!SHEETS_URL){ alert('SHEETS_URL belum diisi.'); return; }
-  try{
-    await fetch(SHEETS_URL, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        token:'ZOOLEPTO123',
-        action:'appendBatch',
-        rows: arr.map(flattenCase) // pakai struktur yang sama seperti ekspor Excel
-      })
-    });
-    alert('Sync batch ke Google Sheets terkirim.');
-  }catch(e){
-    alert('Gagal sync: '+e);
-  }
+// =====================
+// GOOGLE SHEETS (OPSIONAL)
+// =====================
+async function sendRowToSheets(row){
+  if(!SHEETS_URL){ console.warn('SHEETS_URL kosong'); return; }
+  try{ await fetch(SHEETS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:ACCESS_TOKEN,action:'append',row})}); }catch(e){ console.warn('Gagal kirim Sheets:',e); }
 }
+async function sendAllToSheets(){
+  if(!SHEETS_URL){ alert('SHEETS_URL belum diisi.'); return; }
+  const arr=loadCases(); if(!arr.length){ alert('Tidak ada data.'); return; }
+  try{
+    await fetch(SHEETS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:ACCESS_TOKEN,action:'appendBatch',rows:arr.map(flattenCase)})});
+    alert('Sync batch ke Google Sheets terkirim.');
+  }catch(e){ alert('Gagal sync: '+e); }
+}
+document.getElementById('syncSheets')?.addEventListener('click', sendAllToSheets);
