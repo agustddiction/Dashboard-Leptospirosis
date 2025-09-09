@@ -1,7 +1,7 @@
 # Leptospirosis Dashboard + Peta Choropleth (GitHub Pages)
-- Token gate (**ZOOLEPTO123**) — klik *Masuk* atau tekan **Enter**.
+- Token gate — klik *Masuk* atau tekan **Enter**.
 - Peta di bagian paling bawah, **background putih**, auto-load GeoJSON provinsi dari:
-  https://raw.githubusercontent.com/agustddiction/Dashboard-Leptospirosis/main/provinsi.json
+  https://raw.githubusercontent.com/agustddiction/Dashboard-Leptospirosis/main/data/provinsi.json
 - **Export PNG** peta (gradiasi sesuai jumlah kasus).
 - Data kab/kota di `data/kabkota.json` (bisa dilengkapi).
 
