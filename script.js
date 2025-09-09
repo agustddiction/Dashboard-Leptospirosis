@@ -2,6 +2,7 @@
 // =====================
 // KONFIG
 // =====================
+const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbxFHgRel9-LTQTc0YIjy5G22BWk1RiqUjjDqCd8XE1Q4tF8h4t5r8X9WL-MwVZ2IyyYHg/exec';
 const ACCESS_TOKEN = 'ZOOLEPTO123';
 const DEFAULT_GH = 'https://raw.githubusercontent.com/agustddiction/Dashboard-Leptospirosis/main/data/provinsi.json'; // RAW only
 
@@ -121,7 +122,7 @@ function initGejalaChecklist(){
     grid.appendChild(wrap);
     const cb = wrap.querySelector('input[type=checkbox]');
     const dt = wrap.querySelector('input[type=date]');
-    cb.addEventListener('change', ()=>{ dt.classList.toggle('hidden', !cb.checked); updateOnset(); updateDefinisiBadge(); });
+    cb.addEventListener('change', ()=>{ dt.cexcellassList.toggle('hidden', !cb.checked); updateOnset(); updateDefinisiBadge(); });
     dt.addEventListener('change', ()=>{ updateOnset(); updateDefinisiBadge(); });
   });
 }
@@ -333,7 +334,10 @@ document.getElementById('simpan').addEventListener('click', (e)=>{
   if(!data.prov || !data.kab){ alert('Provinsi dan Kabupaten/Kota wajib dipilih.'); return; }
   const arr = loadCases(); arr.push(data); saveCases(arr);
   renderTable(); renderCounts(); updateCharts(); recalcCasesFromLocalAndRefresh();
+  // >>> Tambahkan baris ini untuk kirim 1 baris ke Sheets <<<
+  sendRowToSheets(flattenCase(data));
   alert('Kasus disimpan.');
+document.getElementById('syncSheets')?.addEventListener('click', sendAllToSheets);
 });
 function duplicateKey(d){ return [norm(d.nama), norm(d.umur), norm(d.alamat), d.onset || ''].join('|'); }
 document.getElementById('cekDup').addEventListener('click', ()=>{
@@ -537,3 +541,38 @@ function exportToExcel(){
   XLSX.writeFile(wb, 'leptospirosis_cases.xlsx');
 }
 document.getElementById('exportExcel').addEventListener('click', exportToExcel);
+async function sendRowToSheets(row){
+  if(!SHEETS_URL){ alert('SHEETS_URL belum diisi.'); return; }
+  try{
+    const res = await fetch(SHEETS_URL, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ token:'ZOOLEPTO123', action:'append', row })
+      // Jika kena CORS, ganti: mode:'no-cors' (tapi tidak bisa baca res)
+    });
+    // Optional: cek respons JSON (bisa saja diblokir CORS di beberapa setup)
+    // const j = await res.json(); console.log('Sheets:', j);
+  }catch(e){
+    console.warn('Gagal kirim ke Sheets:', e);
+  }
+}
+
+async function sendAllToSheets(){
+  const arr = loadCases();
+  if(!arr.length){ alert('Tidak ada data.'); return; }
+  if(!SHEETS_URL){ alert('SHEETS_URL belum diisi.'); return; }
+  try{
+    await fetch(SHEETS_URL, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        token:'ZOOLEPTO123',
+        action:'appendBatch',
+        rows: arr.map(flattenCase) // pakai struktur yang sama seperti ekspor Excel
+      })
+    });
+    alert('Sync batch ke Google Sheets terkirim.');
+  }catch(e){
+    alert('Gagal sync: '+e);
+  }
+}
