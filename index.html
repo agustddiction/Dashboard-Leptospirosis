@@ -11,7 +11,6 @@
 <!-- Leaflet CSS & JS (CDN) -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-<!-- Leaflet Image for PNG export -->
 <script src="https://unpkg.com/leaflet-image/leaflet-image.js"></script>
 </head>
 <body>
@@ -76,6 +75,14 @@
       <h2>Riwayat Gejala</h2>
       <div class="muted small">Centang gejala yang muncul. Jika dicentang, isi tanggal munculnya gejala. Onset otomatis diambil dari tanggal gejala paling awal.</div>
       <div class="grid-2" id="gejalaGrid"></div>
+      <div id="manualOnsetWrap" class="row hidden" style="margin-top:8px">
+        <div style="min-width:260px">
+          <label>Tanggal gejala (manual)</label>
+          <input id="onsetManual" type="date" max="2025-09-09" />
+          <div class="muted">Gunakan ini hanya jika <b>tidak ada gejala yang dicentang</b>.</div>
+        </div>
+      </div>
+
       <div class="hr"></div>
       <div class="row">
         <div><span class="muted">Tanggal onset (otomatis)</span></div>
@@ -221,7 +228,7 @@
       <div class="case-counts" id="counts"></div>
       <div class="hr"></div>
       <div class="sticky-filters">
-        <div class="time-toggle">
+        <div class="row">
           <div>
             <label>Mode Waktu</label>
             <select id="fTimeMode">
@@ -229,29 +236,22 @@
               <option value="year">Tahun</option>
             </select>
           </div>
-
-          <div id="monthRange" class="group">
-            <div>
-              <label>Dari Bulan</label>
-              <input id="fStart" type="month"/>
-            </div>
-            <div>
-              <label>Sampai Bulan</label>
-              <input id="fEnd" type="month"/>
-            </div>
+          <div>
+            <label>Dari Bulan</label>
+            <input id="fStart" type="month"/>
           </div>
-
-          <div id="yearRange" class="group hidden">
-            <div>
-              <label>Dari Tahun</label>
-              <input id="fYearStart" class="year" type="number" min="2000" max="2100" placeholder="mis. 2023"/>
-            </div>
-            <div>
-              <label>Sampai Tahun</label>
-              <input id="fYearEnd" class="year" type="number" min="2000" max="2100" placeholder="mis. 2025"/>
-            </div>
+          <div>
+            <label>Sampai Bulan</label>
+            <input id="fEnd" type="month"/>
           </div>
-
+          <div>
+            <label>Dari Tahun</label>
+            <input id="fYearStart" type="number" min="2000" max="2100" placeholder="mis. 2023"/>
+          </div>
+          <div>
+            <label>Sampai Tahun</label>
+            <input id="fYearEnd" type="number" min="2000" max="2100" placeholder="mis. 2025"/>
+          </div>
           <div>
             <label>Filter Provinsi</label>
             <select id="fProv"></select>
