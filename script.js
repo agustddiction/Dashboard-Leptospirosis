@@ -12,7 +12,7 @@ const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbxFHgRel9-LTQTc0YIjy
 let unlocked = false;
 function showLock(){ const lock=document.getElementById('lock'); if(lock){ lock.classList.remove('hidden'); document.body.classList.add('locked'); setTimeout(()=>document.getElementById('tokenInput')?.focus(),50);} }
 function afterUnlock(){
-  unlocked = false;
+  unlocked = true;
   hideLock();
   // Pastikan map & chart terlihat setelah overlay hilang
   setTimeout(()=>{
