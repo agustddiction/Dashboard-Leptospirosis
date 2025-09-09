@@ -68,13 +68,13 @@
           <select id="kab"></select>
         </div>
       </div>
-      <label>Alamat Lengkap (RT/RW, Kelurahan, Kecamatan/Dusun/Desa)</label>
+      <label>Alamat Lengkap (RT/RW/Dusun/Desa/Kelurahan/Kecamatan)</label>
       <textarea id="alamat" placeholder="Tulis alamat lengkap..."></textarea>
     </section>
 
     <section id="gejala">
       <h2>Riwayat Gejala</h2>
-      <div class="muted small">Centang gejala yang muncul. Jika dicentang, isi tanggal munculnya gejala. Onset otomatis diambil dari tanggal gejala paling awal.</div>
+      <div class="muted small">Centang gejala yang muncul dan isi tanggal munculnya gejala</div>
       <div class="grid-2" id="gejalaGrid"></div>
       <div class="hr"></div>
       <div class="row">
@@ -254,7 +254,6 @@
             <input type="number" id="yStart" placeholder="Awal" min="2000" style="max-width:100px">
             <input type="number" id="yEnd" placeholder="Akhir" min="2000" style="max-width:100px">
           </div>
-          <div class="small-note">Jika kosong, otomatis dari data.</div>
         </div>
         <div class="group" style="min-width:160px">
           <label>Jenis Grafik Kab/Kota</label>
@@ -266,30 +265,19 @@
       </div>
 
       <div>
-        <label class="muted">Tren kasus (otomatis mengikuti filter di atas)</label>
+        <label class="muted">Tren kasus</label>
         <canvas id="trendChart" height="120"></canvas>
       </div>
       <div style="margin-top:16px">
         <label class="muted">Sebaran kasus per kabupaten/kota</label>
         <canvas id="kabChart" height="120"></canvas>
-        <div class="small-note">Jika provinsi tidak dipilih, akan ditampilkan 10 kab/kota dengan kasus terbanyak dari seluruh data.</div>
+        <div class="small-note">10 kab/kota dengan kasus terbanyak dari seluruh data.</div>
       </div>
     </section>
 
     <section id="peta">
       <h2 aria-label="Judul peta">Sebaran Jumlah Kasus Leptospirosis per Provinsi, Indonesia</h2>
-      <div class="sub" style="margin-top:-6px">Contoh data — ganti dengan data aktual</div>
-      <div class="row" style="margin-top:12px">
-        <button id="recalcMap" class="btn" title="Hitung peta berdasarkan data tersimpan">Hitung dari Data</button>
-        <button id="exportPng" class="btn" title="Ekspor peta sebagai PNG">Export PNG</button>
-      </div>
-      <div id="map" aria-label="Peta persebaran kasus per provinsi"></div>
-      <div class="footnote">Peta menggunakan GeoJSON provinsi dari tautan Anda (auto-load RAW GitHub). Background putih tanpa tile.</div>
-    </section>
 
-    <footer class="wrap" style="padding-bottom:48px">
-      <div class="footnote">Data disimpan di <em>localStorage</em>. Untuk sinkronisasi Google Sheets, atur <code>apps_script.gs</code> & <code>SHEETS_URL</code> di <code>script.js</code>.</div>
-    </footer>
   </main>
 
 <script src="script.js"></script>
