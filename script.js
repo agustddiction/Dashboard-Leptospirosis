@@ -37,29 +37,38 @@ const AUTO_PULL_INTERVAL_MS = 30 * 60 * 1000; // setiap 30 menit
 let unlocked = false;
 function showLock(){ const lock=document.getElementById('lock'); if(lock){ lock.classList.remove('hidden'); document.body.classList.add('locked'); attachLockHandlers(); setTimeout(()=>document.getElementById('tokenInput')?.focus(),50);} }
 function afterUnlock(){
-  unlocked = true;
-  hideLock();
-  // Pastikan map & chart terlihat setelah overlay hilang
+  document.body.classList.remove('locked');
+  renderTable();
+  renderCounts();
+  updateCharts();
+  recalcCasesFromLocalAndRefresh();
   setTimeout(()=>{
     initMap();
     try{ trendChart?.resize(); kabChart?.resize(); }catch(_){}
-    setTimeout(()=>{ if(window._leaf_map) { window._leaf_map.invalidateSize(); try{ fitIndonesia(); }catch(_){}} }, 200);
-  }, 100);
+    setTimeout(()=>{ if(window._leaf_map){ window._leaf_map.invalidateSize(); fitIndonesia(); }}, 200);
+    scheduleAutoPull();  // auto tarik data Google Sheet
+  },100);
 }
 function hideLock(){ const lock=document.getElementById('lock'); if(lock){ lock.remove(); document.body.classList.remove('locked'); } }
 function attachLockHandlers(){
   const btn=document.getElementById('unlockBtn');
   const form=document.getElementById('lockForm');
   const input=document.getElementById('tokenInput');
-  if(btn) btn.addEventListener('click', (e)=>{ e.preventDefault(); verifyToken(); });
-  if(form) form.addEventListener('submit', (e)=>{ e.preventDefault(); verifyToken(); });
-  if(input) input.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); verifyToken(); } });
+  if(btn) btn.addEventListener('click', e=>{ e.preventDefault(); verifyToken(); });
+  if(form) form.addEventListener('submit', e=>{ e.preventDefault(); verifyToken(); });
+  if(input) input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); verifyToken(); } });
 }
 function verifyToken(){
-  const val=(document.getElementById('tokenInput')?.value||'').trim();
-  const err=document.getElementById('lockErr');
-  if(val===ACCESS_TOKEN){ localStorage.setItem('lepto_token_ok','1'); afterUnlock(); } else { if(err){err.textContent='Token salah. Coba lagi.'; err.style.display='block';} }
+  const val = document.getElementById('tokenInput')?.value.trim();
+  if(val === ACCESS_TOKEN){
+    localStorage.setItem('lepto_token_ok','1'); 
+    hideLock();
+    afterUnlock(); 
+  } 
+  else {
+    alert('Token salah'); }
 }
+
 function autoUnlockFromURL(){ try{ const t=new URLSearchParams(location.search).get('token'); if(t===ACCESS_TOKEN){ localStorage.setItem('lepto_token_ok','1'); afterUnlock(); } }catch(e){} }
 (function(){
   const sp = new URLSearchParams(location.search);
