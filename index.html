@@ -214,13 +214,12 @@
     <section id="aksi">
       <div class="row">
         <button class="btn primary" id="simpan">Simpan Kasus</button>
+        <button class="btn" id="cancelEdit">Batal Edit</button>
         <button class="btn" id="reset">Reset Form</button>
         <span class="right"></span>
         <button class="btn" id="cekDup">Cek Duplikat</button>
         <button class="btn destructive" id="hapusDup">Hapus Duplikat</button>
         <button class="btn" id="exportExcel">Ekspor Excel</button>
-        <button class="btn" id="pullSheets">Tarik dari Google Sheet</button>
-        <button class="btn" id="syncSheets">Kirim ke Google Sheet</button>
         <span id="pullStatus" class="muted" style="align-self:center"></span>
       </div>
     </section>
@@ -230,7 +229,8 @@
       <div class="case-counts" id="counts"></div>
       <div class="hr"></div>
       <div class="sticky-filters">
-        <div class="row">
+        <div class="toolbar">
+          <div class="filters-grid">
           <div>
             <label>Mode Waktu</label>
             <select id="fTimeMode">
@@ -265,8 +265,14 @@
   </div>
 </div>
 
-          <div style="align-self:flex-end">
-            <button class="btn" id="applyFilter">Terapkan</button>
+            <div style="align-self:flex-end">
+              <button class="btn" id="applyFilter">Terapkan</button>
+            </div>
+          </div>
+          <div class="sheets-actions">
+            <button class="btn" id="pullSheets">Tarik dari Google Sheet</button>
+            <button class="btn" id="syncSheets">Kirim ke Google Sheet</button>
+            <span id="pullStatus" class="muted"></span>
           </div>
         </div>
       </div>

@@ -1,21 +1,34 @@
 
 // =====================
 // KONFIGURASI
+
+// =====================
+// UUID helpers
+// =====================
+function genUUID(){
+  try{ if (crypto && crypto.randomUUID) return crypto.randomUUID(); }catch(_){}
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c){
+    const r = Math.random()*16|0, v = c === 'x' ? r : (r&0x3|0x8);
+    return v.toString(16);
+  });
+}
+let editingUUID = null;
+
 // =====================
 const ACCESS_TOKEN = 'ZOOLEPTO123';
 const DEFAULT_GH = 'https://raw.githubusercontent.com/agustddiction/Dashboard-Leptospirosis/main/provinsi.json';
-const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbxFHgRel9-LTQTc0YIjy5G22BWk1RiqUjjDqCd8XE1Q4tF8h4t5r8X9WL-MwVZ2IyyYHg/exec'; // WRITE endpoint (Apps Script /exec)
+const SHEETS_URL = ''; // WRITE endpoint (Apps Script /exec)
 
 // Force token screen every visit
 const REQUIRE_TOKEN_EVERY_LOAD = true;
 
 // Google Sheets READ (GViz JSON). Isi SPREADSHEET_ID dan SHEET_NAME:
-const SPREADSHEET_ID = '1rcySn3UNzsEHCd7t7ld4f-pSBUTrbNDBDgvxjbLcRm4';
+const SPREADSHEET_ID = 'GANTI_DENGAN_ID_SHEET_ANDA';
 const SHEET_NAME = 'Kasus';
 const SHEETS_READ_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json`;
 // Auto tarik data
 const AUTO_PULL = true; // aktifkan auto-pull
-const AUTO_PULL_INTERVAL_MS = 60 * 60 * 1000; // setiap 60 menit
+const AUTO_PULL_INTERVAL_MS = 5 * 60 * 1000; // setiap 5 menit
 
 
 // =====================
@@ -248,11 +261,12 @@ function updateDefinisiBadge(){
 // =====================
 function norm(s){ return (s||"").toString().trim().toLowerCase().replace(/\s+/g,' '); }
 function getFormData(){
+  const currUuid = (editingIndex>=0 ? (loadCases()[editingIndex]?.uuid) : null) || editingUUID || genUUID();
   const onsetDate=getOnsetDate();
   const gejala={}; const gejalaTgl={};
   GEJALA.forEach(g=>{ gejala[g.label]=document.getElementById('g_'+g.id).checked; gejalaTgl[g.label]=(document.getElementById('d_'+g.id).value||""); });
   const paparan=PAPARAN.map((p,idx)=>({label:p,checked:document.getElementById('p_'+idx).checked}));
-  return {
+  return { uuid: currUuid,
     nama:document.getElementById('nama').value,
     jk:document.getElementById('jk').value,
     umur:document.getElementById('umur').value,
@@ -333,11 +347,22 @@ function renderTable(){
     tr.innerHTML=`
       <td>${d.nama}</td><td>${d.umur}</td><td>${d.prov}</td><td>${d.kab}</td>
       <td>${d.onset||'-'}</td><td><span class="tag ${defClass(d.definisi)}">${d.definisi}</span></td>
-      <td>${d.statusAkhir||'-'}</td><td><button class="btn small" data-del="${i}">Hapus</button></td>`;
+      <td>${d.statusAkhir||'-'}</td><td><button class="btn small" data-edit="${i}">Edit</button> <button class="btn small" data-del="${i}">Hapus</button></td>`;
     tbody.appendChild(tr);
   });
+  tbody.querySelectorAll('button[data-edit]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ const i=+btn.dataset.edit; const arr=loadCases(); editingIndex=i; loadCaseIntoForm(arr[i]); });
+  });
   tbody.querySelectorAll('button[data-del]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{ const i=+btn.dataset.del; const arr=loadCases(); arr.splice(i,1); saveCases(arr); renderTable(); renderCounts(); updateCharts(); recalcCasesFromLocalAndRefresh(); });
+    btn.addEventListener('click', ()=>{ const i=+btn.dataset.del; const arr=loadCases(); arr.splice(i,1); saveCases(arr); 
+function ensureUUIDs(){
+  const arr = loadCases();
+  let changed = false;
+  arr.forEach(d=>{ if(!d.uuid){ d.uuid = genUUID(); changed = true; } });
+  if(changed) saveCases(arr);
+}
+
+renderTable(); renderCounts(); updateCharts(); recalcCasesFromLocalAndRefresh(); });
   });
 }
 document.getElementById('simpan').addEventListener('click', e=>{
@@ -345,11 +370,81 @@ document.getElementById('simpan').addEventListener('click', e=>{
   const data=getFormData();
   if(!data.nama){ alert('Nama wajib diisi.'); return; }
   if(!data.prov||!data.kab){ alert('Provinsi dan Kabupaten/Kota wajib dipilih.'); return; }
-  const arr=loadCases(); arr.push(data); saveCases(arr);
+  const arr=loadCases(); if(editingIndex>=0){ arr[editingIndex]=data; saveCases(arr); cancelEdit(); } else { arr.push(data); saveCases(arr); }
   renderTable(); renderCounts(); updateCharts(); recalcCasesFromLocalAndRefresh();
   if(typeof sendRowToSheets==='function'){ try{ sendRowToSheets(flattenCase(data)); }catch(_e){} }
   alert('Kasus disimpan.');
 });
+
+// =====================
+// EDITING SUPPORT
+// =====================
+let editingIndex = -1;
+let editingUUID = null;
+function setSelectValue(sel, val){
+  if(!sel) return;
+  const opt = Array.from(sel.options).find(o => o.value===val);
+  if(opt){ sel.value = val; sel.dispatchEvent(new Event('change')); }
+}
+function loadCaseIntoForm(d){ editingUUID = d.uuid || null;
+  // Data Pasien
+  document.getElementById('nama').value = d.nama||'';
+  setSelectValue(document.getElementById('jk'), d.jk||'');
+  document.getElementById('umur').value = d.umur||'';
+  document.getElementById('kerja').value = d.kerja||'';
+  setSelectValue(document.getElementById('prov'), d.prov||'');
+  // update kab list after prov change
+  setTimeout(()=> setSelectValue(document.getElementById('kab'), d.kab||''), 0);
+  document.getElementById('alamat').value = d.alamat||'';
+
+  // Gejala
+  initGejalaChecklist();
+  // map by label
+  Object.entries(d.gejala||{}).forEach(([label,checked])=>{
+    const g = GEJALA.find(x => x.label === label);
+    if(g){
+      const cb = document.getElementById('g_'+g.id);
+      const dt = document.getElementById('d_'+g.id);
+      if(cb){ cb.checked = !!checked; }
+      const tgl = (d.gejalaTgl||{})[label] || '';
+      if(dt){ if(cb.checked){ dt.style.display=''; dt.value = tgl; } else { dt.style.display='none'; dt.value = ''; } }
+    }
+  });
+  toggleManualOnset(); updateOnset();
+
+  // Paparan
+  initPaparanChecklist();
+  (d.paparan||[]).forEach((p,idx)=>{
+    const el = document.getElementById('p_'+idx);
+    if(el) el.checked = !!p.checked;
+  });
+
+  // Lab
+  const Lb = d.lab||{};
+  const setVal = (id,v)=>{ const el=document.getElementById(id); if(el) el.value = (v ?? ''); };
+  ['leukosit','trombosit','bilirubin','sgot','sgpt','kreatinin','amilase','cpk','serovar'].forEach(id=> setVal(id, Lb[id]));
+  const setRadio=(name,v)=>{ const el=document.querySelector(`input[name="${name}"][value="${v}"]`); if(el) el.checked = true; };
+  setRadio('rdt', Lb.rdt||'nd'); setRadio('mat', Lb.mat||'nd'); setRadio('pcr', Lb.pcr||'nd');
+  document.getElementById('proteinuria').checked = !!Lb.proteinuria;
+  document.getElementById('hematuria').checked = !!Lb.hematuria;
+
+  // Status
+  setSelectValue(document.getElementById('statusAkhir'), d.statusAkhir||'');
+  document.getElementById('tglStatus').value = d.tglStatus||'';
+  document.getElementById('obat').value = d.obat||'';
+
+  updateDefinisiBadge();
+  document.getElementById('simpan').textContent = 'Update Kasus';
+  document.body.classList.add('editing');
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+function cancelEdit(){ editingUUID = null;
+  editingIndex = -1;
+  document.getElementById('simpan').textContent = 'Simpan Kasus';
+  document.body.classList.remove('editing');
+  resetForm();
+}
+document.getElementById('cancelEdit').addEventListener('click', (e)=>{ e.preventDefault(); cancelEdit(); });
 function duplicateKey(d){ return [norm(d.nama),norm(d.umur),norm(d.alamat),d.onset||''].join('|'); }
 document.getElementById('cekDup').addEventListener('click', ()=>{
   const arr=loadCases(); const seen={}; const dups=new Set();
@@ -425,7 +520,7 @@ function ensureMap(){ if(window._leaf_map) return window._leaf_map; window._leaf
 let casesByProvince={"Aceh":12,"Sumatera Utara":28,"Sumatera Barat":8,"Riau":15,"Jambi":5,"Sumatera Selatan":31,"Bengkulu":2,"Lampung":44,"Kepulauan Bangka Belitung":1,"Kepulauan Riau":3,"DKI Jakarta":320,"Jawa Barat":188,"Jawa Tengah":96,"DI Yogyakarta":45,"Jawa Timur":210,"Banten":74,"Bali":12,"Nusa Tenggara Barat":9,"Nusa Tenggara Timur":20,"Kalimantan Barat":6,"Kalimantan Tengah":4,"Kalimantan Selatan":11,"Kalimantan Timur":7,"Kalimantan Utara":1,"Sulawesi Utara":5,"Sulawesi Tengah":6,"Sulawesi Selatan":130,"Sulawesi Tenggara":4,"Gorontalo":1,"Sulawesi Barat":2,"Maluku":1,"Maluku Utara":1,"Papua Barat":1,"Papua":2,"Papua Selatan":0,"Papua Tengah":0,"Papua Pegunungan":0};
 function totalNational(){ return Object.values(casesByProvince).reduce((a,b)=>a+(+b||0),0); }
 function getProvName(props){ return props?.provinsi||props?.Provinsi||props?.PROVINSI||props?.NAME_1||props?.Name||props?.WADMPR||props?.wadmpr||props?.WADMPRV||props?.nama||props?.name||''; }
-function styleFeature(feat){ const prov=getProvName(feat.properties||{}); const val=+casesByProvince[prov]||0; return {weight:1,color:'#9ca3af',fillColor:getColor(val),fillOpacity:0.8}; }
+function styleFeature(feat){ const prov=getProvName(feat.properties||{}); const val=+casesByProvince[prov]||0; return { uuid: currUuid,weight:1,color:'#9ca3af',fillColor:getColor(val),fillOpacity:0.8}; }
 function highlightFeature(e){ e.target.setStyle({weight:2,fillOpacity:0.9,color:'#6b7280'}); e.target.bringToFront?.(); }
 function resetHighlight(e){ geojsonLayer && geojsonLayer.resetStyle(e.target); }
 function onEachFeature(feature, layer){
@@ -490,13 +585,15 @@ const _root=document.querySelector('main');
 function _autoUpd(){ updateOnset(); updateDefinisiBadge(); toggleManualOnset(); }
 _root.addEventListener('input', _autoUpd, true);
 _root.addEventListener('change', _autoUpd, true);
-updateOnset(); updateDefinisiBadge(); renderTable(); renderCounts(); updateCharts();
+_root.addEventListener('keyup', _autoUpd, true);
+_root.addEventListener('click', _autoUpd, true);
+updateOnset(); updateDefinisiBadge(); ensureUUIDs(); renderTable(); renderCounts(); updateCharts();
 
 // =====================
 // EKSPOR EXCEL
 // =====================
 function flattenCase(d){
-  const row={ 'Nama':d.nama,'Jenis Kelamin':d.jk,'Umur':d.umur,'Pekerjaan':d.kerja,'Provinsi':d.prov,'Kab/Kota':d.kab,'Alamat':d.alamat,'Onset':d.onset,'Tanggal Paparan':d.tglPaparan,'Definisi':d.definisi,'Status Akhir':d.statusAkhir,'Tanggal Status':d.tglStatus,'Obat':d.obat,'Saved At':d.savedAt };
+  const row={ 'UUID':d.uuid||'', 'Nama':d.nama,'Jenis Kelamin':d.jk,'Umur':d.umur,'Pekerjaan':d.kerja,'Provinsi':d.prov,'Kab/Kota':d.kab,'Alamat':d.alamat,'Onset':d.onset,'Tanggal Paparan':d.tglPaparan,'Definisi':d.definisi,'Status Akhir':d.statusAkhir,'Tanggal Status':d.tglStatus,'Obat':d.obat,'Saved At':d.savedAt };
   GEJALA.forEach(g=>{ const label=g.label; row['Gejala: '+label]=d.gejala[label]?'Ya':''; row['Tgl '+label]=d.gejalaTgl[label]||''; });
   row['Paparan (2 minggu)']=(d.paparan||[]).filter(x=>x.checked).map(x=>x.label).join('; ');
   const Lb=d.lab||{}; row['Leukosit (x10^3/µL)']=Lb.leukosit||''; row['Trombosit (x10^3/µL)']=Lb.trombosit||'';
@@ -612,7 +709,7 @@ function parseGVizJSON(text){
   return rows.map(vals=>{ const o={}; headers.forEach((h,i)=>o[h]=vals[i]); return o; });
 }
 function flatToCase(r){
-  return {
+  return { uuid: r['UUID']||'', uuid: currUuid,
     nama: r['Nama']||'',
     jk: r['Jenis Kelamin']||'',
     umur: r['Umur']||'',
@@ -648,22 +745,25 @@ function flatToCase(r){
   };
 }
 function mergeCases(localArr, remoteArr){
+
   const byKey = new Map();
   const toDate = s => { try{ return new Date(s); }catch(_){ return new Date(0);} };
-  // seed with local
-  localArr.forEach(d=>{ byKey.set(duplicateKey(d), d); });
-  // merge remote (newer wins)
+  const getKey = d => (d && d.uuid) ? ('uuid:'+d.uuid) : ('dup:'+duplicateKey(d));
+
+  localArr.forEach(d=>{ byKey.set(getKey(d), d); });
+
   remoteArr.forEach(r=>{
-    const k=duplicateKey(r);
+    const k = getKey(r);
     if(!byKey.has(k)){ byKey.set(k, r); }
     else {
-      const a=byKey.get(k);
+      const a = byKey.get(k);
       const tA = toDate(a.savedAt||a.tglStatus||a.onset||'1970-01-01');
       const tB = toDate(r.savedAt||r.tglStatus||r.onset||'1970-01-01');
       if(tB>tA) byKey.set(k, r);
     }
   });
   return Array.from(byKey.values());
+return Array.from(byKey.values());
 }
 
 // Ganti pullFromSheets: support {merge:true|false} dan tanpa alert saat auto

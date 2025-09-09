@@ -56,3 +56,18 @@ body.locked{ overflow:hidden }
 @media (max-width:720px){
   .filters-pair{ grid-template-columns:1fr } /* stack on phones */
 }
+
+/* Toolbar filters + Sheets buttons */
+.toolbar{ display:grid; grid-template-columns: 1fr auto; gap:12px; align-items:end }
+.filters-grid{ display:grid; grid-template-columns: repeat(4, minmax(160px,1fr)); gap:10px }
+.filters-grid .wide{ grid-column: span 2 }
+.sheets-actions{ display:flex; gap:8px; align-items:center; justify-content:flex-end; flex-wrap:wrap }
+@media (max-width: 980px){
+  .filters-grid{ grid-template-columns: repeat(2, minmax(160px,1fr)); }
+  .toolbar{ grid-template-columns: 1fr }
+  .sheets-actions{ justify-content:flex-start }
+}
+/* Edit mode indicators */
+.editing .badge{ box-shadow:0 0 0 2px #111 inset }
+#cancelEdit{ display:none }
+.editing #cancelEdit{ display:inline-block }
