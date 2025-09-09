@@ -7,7 +7,9 @@
 <!-- Chart.js CDN -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<style>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <style>
   :root{
     --bg:#ffffff;
     --fg:#111111;
@@ -362,6 +364,50 @@
   </main>
 
 <script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<!-- Plugin render peta ke canvas untuk ekspor PNG -->
+<script src="https://unpkg.com/leaflet-image/leaflet-image.js"></script>
+<style>
+:root{ --line:#e5e7eb; --fg:#111; --muted:#6b7280; }
+*{box-sizing:border-box}
+body{ margin:0; font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; color:var(--fg); background:#fff }
+header{ padding:16px 18px; border-bottom:1px solid var(--line) }
+h1{ font-size:18px; margin:0 0 4px }
+.sub{ font-size:12px; color:var(--muted) }
+main{ padding:16px 18px; max-width:1200px; margin:0 auto }
+.row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:10px 0 14px }
+.btn{ appearance:none; border:1px solid var(--line); background:#fff; color:#111; padding:8px 12px; border-radius:10px; cursor:pointer }
+input[type=file], input[type=url]{ font-size:14px }
+#map{ height:520px; width:100%; border:1px solid var(--line); border-radius:12px }
+@media (max-width:600px){ #map{ height:360px } }
+.legend{ background:#fff; border:1px solid var(--line); border-radius:8px; padding:8px 10px; line-height:1.2; font-size:12px }
+.legend-title{ font-weight:700; margin-bottom:6px }
+.legend-row{ display:flex; align-items:center; gap:8px; margin:4px 0 }
+.swatch{ width:14px; height:14px; border-radius:3px; border:1px solid var(--line); display:inline-block }
+.leaflet-tooltip.prov-label{ background:transparent; border:none; box-shadow:none; color:#333; font-weight:700; font-size:12px; text-shadow:0 0 2px #fff }
+.footnote{ font-size:12px; color:var(--muted); margin-top:8px }
+.leaflet-interactive{ cursor:pointer }
+</style>
+</head>
+<body>
+<header>
+<h1 aria-label="Judul peta">Sebaran Jumlah Kasus Leptospirosis per Provinsi, Indonesia</h1>
+<div class="sub">Contoh data — ganti dengan data aktual</div>
+</header>
+<main>
+<div class="row">
+<label for="gj" class="btn" title="Unggah GeoJSON provinsi Indonesia">Unggah GeoJSON</label>
+<input id="gj" type="file" accept=".geojson,application/json" aria-label="Unggah GeoJSON provinsi Indonesia" style="display:none"/>
+<input id="ghUrl" type="url" placeholder="https://raw.githubusercontent.com/username/repo/branch/path/provinsi.geojson" aria-label="URL RAW GitHub GeoJSON" style="flex:1; min-width:240px; padding:8px 10px; border:1px solid var(--line); border-radius:10px">
+<button id="loadGithub" class="btn" title="Muat GeoJSON dari URL GitHub RAW">Muat dari GitHub</button>
+<button id="exportPng" class="btn" title="Ekspor peta sebagai PNG">Export PNG</button>
+</div>
+<div id="map" aria-label="Peta persebaran kasus per provinsi"></div>
+<div class="footnote">Cara update data: ubah nilai pada objek <code>casesByProvince</code> di bawah; warna akan menyesuaikan otomatis.</div>
+</main>
+<script>
+  
 // === TOKEN GATE ===
 const ACCESS_TOKEN = 'ZOOLEPTO123';
 function showLock(){
@@ -394,8 +440,7 @@ function verifyToken(){
 })();
 
 /** =========================
- *  DATA MASTER PROV-KAB (contoh ringkas; perlu dilengkapi)
- *  Untuk daftar lengkap, ganti konstanta ini dengan JSON lengkap provinsi→kab/kota.
+ *  DATA MASTER PROV-KAB 
  *  ========================= */
 const PROV_KAB = {
       "Aceh": ["Kabupaten Aceh Barat","Kabupaten Aceh Barat Daya","Kabupaten Aceh Besar","Kabupaten Aceh Jaya","Kabupaten Aceh Selatan","Kabupaten Aceh Singkil","Kabupaten Aceh Tamiang","Kabupaten Aceh Tengah","Kabupaten Aceh Tenggara","Kabupaten Aceh Timur","Kabupaten Aceh Utara","Kabupaten Bener Meriah","Kabupaten Bireuen","Kabupaten Gayo Lues","Kabupaten Nagan Raya","Kabupaten Pidie","Kabupaten Pidie Jaya","Kabupaten Simeulue","Kota Banda Aceh","Kota Langsa","Kota Lhokseumawe","Kota Sabang","Kota Subulussalam"],
@@ -985,6 +1030,84 @@ updateDefinisiBadge();
 renderTable();
 renderCounts();
 updateCharts();
+
+  // ==== KONFIG & DATA CHOROPLETH ====
+const t = L.tooltip({ permanent:true, direction:'center', className:'prov-label' })
+.setContent(String(val))
+.setLatLng(c);
+_labels.push(t); t.addTo(map);
+}
+});
+}
+const legend = L.control({ position:'topright' });
+legend.onAdd = function(){
+const div = L.DomUtil.create('div','legend');
+div.innerHTML = '<div class="legend-title">Kategori Kasus</div>'+
+'<div class="legend-row"><span class="swatch" style="background:#ffffff"></span>0</div>'+
+'<div class="legend-row"><span class="swatch" style="background:#ffc4c4"></span>1–100</div>'+
+'<div class="legend-row"><span class="swatch" style="background:#ff7a7a"></span>101–500</div>'+
+'<div class="legend-row"><span class="swatch" style="background:#cc0000"></span>&gt;500</div>';
+return div;
+};
+function renderChoropleth(geojson){
+ensureMap();
+if(geojsonLayer) map.removeLayer(geojsonLayer);
+geojsonLayer = L.geoJSON(geojson, { style:styleFeature, onEachFeature:onEachFeature }).addTo(map);
+try{ map.fitBounds(geojsonLayer.getBounds(), { padding:[10,10] }); }catch(_){ /* ignore */ }
+if(!legend._map) legend.addTo(map);
+addCenterLabels();
+}
+function refreshColors(){ geojsonLayer && geojsonLayer.setStyle(styleFeature); addCenterLabels(); }
+
+
+// ==== MUAT GEOJSON DARI GITHUB RAW URL ====
+const GH_SOURCE = {
+  owner: 'agustddiction',
+  repo: 'Dashboard-Leptospirosis',
+  branch: 'main',
+  path: 'provinsi.geojson'
+};
+
+
+// ==== EKSPOR PNG DARI PETA (leaflet-image) ====
+function exportPNG(){
+if(!map){ alert('Peta belum dirender.'); return; }
+leafletImage(map, function(err, canvas){
+if(err){ alert('Gagal membuat gambar: '+err); return; }
+const a = document.createElement('a');
+a.download = 'choropleth.png';
+a.href = canvas.toDataURL('image/png');
+a.click();
+});
+}
+
+
+// ==== BIND UI ====
+const input = document.getElementById('gj');
+const btnUpload = document.querySelector('label[for="gj"]');
+const btnRenderLocal = document.getElementById('renderLocal'); // (opsional; tidak dipakai)
+const ghUrl = document.getElementById('ghUrl');
+const loadGithubBtn = document.getElementById('loadGithub');
+const exportBtn = document.getElementById('exportPng');
+
+
+btnUpload?.addEventListener('click', ()=> input.click());
+input?.addEventListener('change', async (e)=>{
+const f = e.target.files && e.target.files[0]; if(!f) return;
+try{ const text = await f.text(); const json = JSON.parse(text); renderChoropleth(json); }
+catch(err){ alert('File GeoJSON tidak valid.'); }
+});
+loadGithubBtn?.addEventListener('click', async ()=>{
+const url = (ghUrl.value||'').trim();
+if(!url){ alert('Masukkan URL RAW GitHub untuk GeoJSON.'); return; }
+try{ const json = await loadFromGitHub(url); renderChoropleth(json); }
+catch(err){ alert('Gagal memuat dari GitHub: '+err.message); }
+});
+exportBtn?.addEventListener('click', exportPNG);
+
+
+// Inisialisasi peta kosong
+ensureMap();
 </script>
 </body>
 </html>
