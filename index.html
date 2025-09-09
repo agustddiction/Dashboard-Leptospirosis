@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Dashboard Leptospirosis — Pencatatan Kasus</title>
-<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="./style.css" />
 <!-- Chart.js & XLSX -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -14,7 +14,8 @@
 <script src="https://unpkg.com/leaflet-image/leaflet-image.js"></script>
 </head>
 <body>
-  <div id="lock" class="lock" aria-label="Kunci Akses">
+  <!-- TOKEN OVERLAY -->
+  <div id="lock" class="lock">
     <div class="lock-card">
       <div class="lock-title">Akses Terbatas</div>
       <div class="lock-sub">Masukkan token untuk membuka dashboard.</div>
@@ -82,7 +83,6 @@
           <div class="muted">Gunakan ini hanya jika <b>tidak ada gejala yang dicentang</b>.</div>
         </div>
       </div>
-
       <div class="hr"></div>
       <div class="row">
         <div><span class="muted">Tanggal onset (otomatis)</span></div>
@@ -134,7 +134,7 @@
       <div class="grid-3" style="margin-top:10px">
         <div>
           <label>RDT</label>
-          <div class="choices" role="radiogroup" aria-label="RDT">
+          <div class="row" role="radiogroup" aria-label="RDT">
             <label class="choice"><input type="radio" name="rdt" value="pos"> Positif</label>
             <label class="choice"><input type="radio" name="rdt" value="neg"> Negatif</label>
             <label class="choice"><input type="radio" name="rdt" value="nd"> Tidak diperiksa</label>
@@ -142,7 +142,7 @@
         </div>
         <div>
           <label>Hasil MAT</label>
-          <div class="choices" role="radiogroup" aria-label="Hasil MAT">
+          <div class="row" role="radiogroup" aria-label="Hasil MAT">
             <label class="choice"><input type="radio" name="mat" value="pos"> Positif</label>
             <label class="choice"><input type="radio" name="mat" value="neg"> Negatif</label>
             <label class="choice"><input type="radio" name="mat" value="nd"> Tidak diperiksa</label>
@@ -155,7 +155,7 @@
       </div>
 
       <details style="margin-top:10px">
-        <summary class="muted">Opsi Lanjutan (Amilase, CPK, Urinalisis)</summary>
+        <summary class="muted">Opsi Lanjutan (Amilase, CPK, Urinalisis, PCR)</summary>
         <div class="grid-3" style="margin-top:10px">
           <div>
             <label>Amilase (U/L) <span class="muted">(N: 30–110)</span></label>
@@ -167,7 +167,7 @@
           </div>
           <div>
             <label>PCR</label>
-            <div class="choices" role="radiogroup" aria-label="PCR">
+            <div class="row" role="radiogroup" aria-label="PCR">
               <label class="choice"><input type="radio" name="pcr" value="pos"> Positif</label>
               <label class="choice"><input type="radio" name="pcr" value="neg"> Negatif</label>
               <label class="choice"><input type="radio" name="pcr" value="nd"> Tidak diperiksa</label>
@@ -218,9 +218,8 @@
         <button class="btn" id="reset">Reset Form</button>
         <span class="right"></span>
         <button class="btn" id="cekDup">Cek Duplikat</button>
-        <button class="btn destructive" id="hapusDup">Hapus Duplikat</button>
+        <button class="btn" id="hapusDup">Hapus Duplikat</button>
         <button class="btn" id="exportExcel">Ekspor Excel</button>
-        <span id="pullStatus" class="muted" style="align-self:center"></span>
       </div>
     </section>
 
@@ -228,43 +227,43 @@
       <h2>Data Kasus Tersimpan</h2>
       <div class="case-counts" id="counts"></div>
       <div class="hr"></div>
+
       <div class="sticky-filters">
         <div class="toolbar">
           <div class="filters-grid">
-          <div>
-            <label>Mode Waktu</label>
-            <select id="fTimeMode">
-              <option value="month">Bulan</option>
-              <option value="year">Tahun</option>
-            </select>
-          </div>
-          <div>
-            <label>Dari Bulan</label>
-            <input id="fStart" type="month"/>
-          </div>
-          <div>
-            <label>Sampai Bulan</label>
-            <input id="fEnd" type="month"/>
-          </div>
-          <div>
-            <label>Dari Tahun</label>
-            <input id="fYearStart" type="number" min="2000" max="2100" placeholder="mis. 2023"/>
-          </div>
-          <div>
-            <label>Sampai Tahun</label>
-            <input id="fYearEnd" type="number" min="2000" max="2100" placeholder="mis. 2025"/>
-          </div>
-<div class="filters-pair">
-  <div>
-    <label>Filter Provinsi</label>
-    <select id="fProv"></select>
-  </div>
-  <div>
-    <label>Filter Kabupaten/Kota</label>
-    <select id="fKab"></select>
-  </div>
-</div>
-
+            <div>
+              <label>Mode Waktu</label>
+              <select id="fTimeMode">
+                <option value="month">Bulan</option>
+                <option value="year">Tahun</option>
+              </select>
+            </div>
+            <div>
+              <label>Dari Bulan</label>
+              <input id="fStart" type="month"/>
+            </div>
+            <div>
+              <label>Sampai Bulan</label>
+              <input id="fEnd" type="month"/>
+            </div>
+            <div>
+              <label>Dari Tahun</label>
+              <input id="fYearStart" type="number" min="2000" max="2100" placeholder="mis. 2023"/>
+            </div>
+            <div>
+              <label>Sampai Tahun</label>
+              <input id="fYearEnd" type="number" min="2000" max="2100" placeholder="mis. 2025"/>
+            </div>
+            <div class="filters-pair">
+              <div>
+                <label>Filter Provinsi</label>
+                <select id="fProv"></select>
+              </div>
+              <div>
+                <label>Filter Kabupaten/Kota</label>
+                <select id="fKab"></select>
+              </div>
+            </div>
             <div style="align-self:flex-end">
               <button class="btn" id="applyFilter">Terapkan</button>
             </div>
@@ -276,10 +275,14 @@
           </div>
         </div>
       </div>
+
       <div style="overflow:auto; margin-top:10px">
         <table class="table" id="casesTable">
           <thead>
-            <tr><th>Nama</th><th>Umur</th><th>Provinsi</th><th>Kab/Kota</th><th>Onset</th><th>Definisi</th><th>Status</th><th>Aksi</th></tr>
+            <tr>
+              <th>Nama</th><th>Umur</th><th>Provinsi</th><th>Kab/Kota</th>
+              <th>Onset</th><th>Definisi</th><th>Status</th><th>Aksi</th>
+            </tr>
           </thead>
           <tbody></tbody>
         </table>
@@ -301,7 +304,8 @@
     </section>
 
     <section id="peta">
-      <h2 aria-label="Judul peta">Sebaran Jumlah Kasus Leptospirosis per Provinsi, Indonesia</h2>
+      <h2 aria-label="Judul peta">Sebaran Jumlah Kasus Leto
+      psirosis per Provinsi, Indonesia</h2>
       <div class="sub" style="margin-top:-6px">Contoh data — ganti dengan data aktual</div>
       <div class="row" style="margin-top:12px">
         <button id="recalcMap" class="btn" title="Hitung peta berdasarkan data tersimpan">Hitung dari Data</button>
@@ -309,7 +313,7 @@
       </div>
       <div id="map" aria-label="Peta persebaran kasus per provinsi"></div>
       <div id="mapMsg" class="muted" style="margin-top:8px"></div>
-      <div class="footnote">Peta menggunakan GeoJSON provinsi dari tautan Anda (auto-load RAW GitHub). Background putih tanpa tile.</div>
+      <div class="footnote">Peta menggunakan GeoJSON provinsi dari tautan Anda (RAW GitHub). Background putih tanpa tile.</div>
     </section>
 
     <footer class="wrap" style="padding-bottom:48px">
@@ -317,6 +321,6 @@
     </footer>
   </main>
 
-<script src="script.js"></script>
+<script defer src="./script.js"></script>
 </body>
 </html>
