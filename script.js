@@ -1,9 +1,10 @@
+
 // =====================
 // KONFIGURASI
 // =====================
 const ACCESS_TOKEN = 'ZOOLEPTO123';
-const DEFAULT_GH = 'https://raw.githubusercontent.com/agustddiction/Dashboard-Leptospirosis/main/data/provinsi.json';
-const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbxFHgRel9-LTQTc0YIjy5G22BWk1RiqUjjDqCd8XE1Q4tF8h4t5r8X9WL-MwVZ2IyyYHg/exec';
+const DEFAULT_GH = 'https://raw.githubusercontent.com/agustddiction/Dashboard-Leptospirosis/main/provinsi.json';
+const SHEETS_URL = ''; // isi Web App URL jika ingin sync ke Google Sheets
 
 // =====================
 // TOKEN GATE
@@ -54,9 +55,16 @@ const PAPARAN=[
   "Hobi/olahraga/wisata (berenang, memancing, arung jeram, dll.)",
 ];
 
+// DOM elemen filter/controls
 const prov=document.getElementById('prov'); const kab=document.getElementById('kab');
 const fProv=document.getElementById('fProv'); const fKab=document.getElementById('fKab');
 const fStart=document.getElementById('fStart'); const fEnd=document.getElementById('fEnd');
+const trendTypeSel=document.getElementById('trendType');
+const trendGranSel=document.getElementById('trendGran');
+const yearRange=document.getElementById('yearRange');
+const yStart=document.getElementById('yStart');
+const yEnd=document.getElementById('yEnd');
+const kabTypeSel=document.getElementById('kabType');
 
 function initProvKab(){
   const provs=Object.keys(PROV_KAB).sort();
@@ -64,16 +72,17 @@ function initProvKab(){
   addOpts(prov,provs,false); addOpts(fProv,provs,true);
   const updateKab=(selKab,provName,withAll=false)=>{ selKab.innerHTML=""; if(withAll) selKab.append(new Option("Semua","")); if(!provName||!PROV_KAB[provName]){ selKab.append(new Option("Pilih provinsi dulu","")); return; } PROV_KAB[provName].forEach(x=>selKab.append(new Option(x,x))); };
   prov.addEventListener('change', ()=>updateKab(kab,prov.value,false));
-  fProv.addEventListener('change', ()=>updateKab(fKab,fProv.value,true));
+  fProv.addEventListener('change', ()=>{ updateKab(fKab,fProv.value,true); updateCharts(); });
+  fKab.addEventListener('change', updateCharts);
   updateKab(kab,prov.value,false); updateKab(fKab,fProv.value,true);
 }
 
 // =====================
-// RIWAYAT GEJALA (FIX: tanggal pasti muncul saat dicentang)
+// GEJALA checklist (tanggal muncul saat dicentang)
 // =====================
 function initGejalaChecklist(){
   const grid=document.getElementById('gejalaGrid');
-  grid.innerHTML=''; // guard if re-init
+  grid.innerHTML='';
   const today=new Date().toISOString().slice(0,10);
   GEJALA.forEach(g=>{
     const wrap=document.createElement('div');
@@ -86,7 +95,6 @@ function initGejalaChecklist(){
     grid.appendChild(wrap);
     const cb=wrap.querySelector('input[type=checkbox]');
     const dt=wrap.querySelector('input[type=date]');
-    // tampilkan/hilangkan date dengan gaya inline (tidak bergantung CSS .hidden)
     const toggle=()=>{ dt.style.display = cb.checked ? '' : 'none'; dt.required = cb.checked; if(cb.checked && !dt.value) dt.value=today; updateOnset(); updateDefinisiBadge(); };
     cb.addEventListener('change', toggle);
     dt.addEventListener('change', ()=>{ updateOnset(); updateDefinisiBadge(); });
@@ -94,9 +102,6 @@ function initGejalaChecklist(){
 }
 initGejalaChecklist();
 
-// =====================
-// PAPARAN
-// =====================
 function initPaparanChecklist(){
   const grid=document.getElementById('paparanGrid'); grid.innerHTML='';
   PAPARAN.forEach((p,idx)=>{
@@ -110,7 +115,7 @@ function initPaparanChecklist(){
 initPaparanChecklist();
 
 // =====================
-// ONSET & DEFINISI KASUS
+// ONSET & DEFINISI
 // =====================
 function getOnsetDate(){
   let earliest=null;
@@ -125,7 +130,6 @@ function getOnsetDate(){
   return earliest;
 }
 function updateOnset(){ const onset=getOnsetDate(); document.getElementById('onsetTag').textContent = onset ? onset.toISOString().slice(0,10) : "—"; }
-
 function getRadio(name){ return (document.querySelector('input[name="'+name+'"]:checked')?.value)||''; }
 function computeDefinisi(){
   const S={}; GEJALA.forEach(g=>{ S[g.id]=document.getElementById('g_'+g.id)?.checked; });
@@ -161,30 +165,12 @@ function updateDefinisiBadge(){
   else if(def==='Suspek') badge.classList.add('neutral');
   else badge.classList.add('bad');
 }
-// Tandai abnormal
-['leukosit','trombosit','bilirubin','sgot','sgpt','kreatinin','amilase','cpk'].forEach(id=>{
-  const el=document.getElementById(id);
-  el && el.addEventListener('input', ()=>{
-    const v=parseFloat(el.value); let abn=false;
-    switch(id){
-      case 'leukosit': abn=!isNaN(v)&&(v<3.5||v>10.5); break;
-      case 'trombosit': abn=!isNaN(v)&&(v<150||v>450); break;
-      case 'bilirubin': abn=!isNaN(v)&&(v>1.2); break;
-      case 'sgot': abn=!isNaN(v)&&(v>40); break;
-      case 'sgpt': abn=!isNaN(v)&&(v>41); break;
-      case 'kreatinin': abn=!isNaN(v)&&(v<0.6||v>1.3); break;
-      case 'amilase': abn=!isNaN(v)&&(v>110); break;
-      case 'cpk': abn=!isNaN(v)&&(v>200); break;
-    }
-    el.classList.toggle('abn', abn);
-    updateDefinisiBadge();
-  });
-});
 
 // =====================
-// CRUD DATA
+// CRUD
 // =====================
 function norm(s){ return (s||"").toString().trim().toLowerCase().replace(/\s+/g,' '); }
+function getRecordDate(d){ return d.onset || d.tglPaparan || (d.savedAt ? d.savedAt.slice(0,10) : ""); }
 function getFormData(){
   const onsetDate=getOnsetDate();
   const gejala={}; const gejalaTgl={};
@@ -249,7 +235,7 @@ function renderTable(){
     const tr=document.createElement('tr');
     tr.innerHTML=`
       <td>${d.nama}</td><td>${d.umur}</td><td>${d.prov}</td><td>${d.kab}</td>
-      <td>${d.onset||'-'}</td><td><span class="tag ${defClass(d.definisi)}">${d.definisi}</span></td>
+      <td>${getRecordDate(d)||'-'}</td><td><span class="tag ${defClass(d.definisi)}">${d.definisi}</span></td>
       <td>${d.statusAkhir||'-'}</td><td><button class="btn small" data-del="${i}">Hapus</button></td>`;
     tbody.appendChild(tr);
   });
@@ -267,13 +253,13 @@ document.getElementById('simpan').addEventListener('click', e=>{
   if(typeof sendRowToSheets==='function'){ try{ sendRowToSheets(flattenCase(data)); }catch(_e){} }
   alert('Kasus disimpan.');
 });
-function duplicateKey(d){ return [norm(d.nama),norm(d.umur),norm(d.alamat),d.onset||''].join('|'); }
+function duplicateKey(d){ return [norm(d.nama),norm(d.umur),norm(d.alamat),getRecordDate(d)||''].join('|'); }
 document.getElementById('cekDup').addEventListener('click', ()=>{
   const arr=loadCases(); const seen={}; const dups=new Set();
   arr.forEach((d,i)=>{ const k=duplicateKey(d); if(seen[k]!==undefined){ dups.add(i); dups.add(seen[k]); } else { seen[k]=i; } });
   const rows=document.querySelectorAll('#casesTable tbody tr');
   rows.forEach((tr,i)=>tr.classList.toggle('dup', dups.has(i)));
-  alert(duplikatMsg=dups.size?'Duplikat ditemukan & ditandai warna krem.':'Tidak ada duplikat.');
+  alert(dups.size?'Duplikat ditemukan & ditandai warna krem.':'Tidak ada duplikat.');
 });
 document.getElementById('hapusDup').addEventListener('click', ()=>{
   const arr=loadCases(); const seen={}; const result=[];
@@ -284,30 +270,160 @@ document.getElementById('hapusDup').addEventListener('click', ()=>{
 });
 
 // =====================
-// CHARTS
+// CHARTS — helpers
 // =====================
 let trendChart, kabChart;
-function ensureCharts(){
-  const ctx1=document.getElementById('trendChart').getContext('2d');
-  const ctx2=document.getElementById('kabChart').getContext('2d');
-  if(!trendChart){ trendChart=new Chart(ctx1,{type:'line',data:{labels:[],datasets:[{label:'Kasus / bulan',data:[]}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}}); }
-  if(!kabChart){ kabChart=new Chart(ctx2,{type:'bar',data:{labels:[],datasets:[{label:'Kasus / kabupaten-kota',data:[]}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}}); }
+function createTrendChart(type){
+  const ctx=document.getElementById('trendChart').getContext('2d');
+  if(trendChart){ trendChart.destroy(); }
+  trendChart=new Chart(ctx,{type:type||'line',data:{labels:[],datasets:[{label:'Kasus',data:[]}]},options:{responsive:true,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false}},scales:{y:{beginAtZero:true}}}});
 }
-ensureCharts();
-function monthKey(d){ return d.slice(0,7); }
-function withinRange(d,start,end){ const m=monthKey(d); if(start&&m<start) return false; if(end&&m>end) return false; return true; }
-function updateCharts(){
-  const arr=loadCases(); const fp=fProv.value||""; const fk=fKab.value||""; const ms=fStart.value||""; const me=fEnd.value||"";
-  const filtered=arr.filter(d=>{ if(fp&&d.prov!==fp) return false; if(fk&&d.kab!==fk) return false; if(d.onset && !withinRange(d.onset,ms,me)) return false; return true; });
-  const perMonth={}; filtered.forEach(d=>{ if(!d.onset) return; const m=monthKey(d.onset); perMonth[m]=(perMonth[m]||0)+1; });
-  const mKeys=Object.keys(perMonth).sort(); trendChart.data.labels=mKeys; trendChart.data.datasets[0].data=mKeys.map(k=>perMonth[k]||0); trendChart.update();
-  const perKab={}; filtered.forEach(d=>{ const kk=d.kab||'(Tidak diisi)'; perKab[kk]=(perKab[kk]||0)+1; });
-  const kLabels=Object.keys(perKab).sort(); kabChart.data.labels=kLabels; kabChart.data.datasets[0].data=kLabels.map(k=>perKab[k]||0); kabChart.update();
+function createKabChart(type){
+  const ctx=document.getElementById('kabChart').getContext('2d');
+  if(kabChart){ kabChart.destroy(); }
+  kabChart=new Chart(ctx,{type:type||'bar',data:{labels:[],datasets:[{label:'Kasus',data:[]}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
 }
-document.getElementById('applyFilter').addEventListener('click', updateCharts);
+createTrendChart(trendTypeSel.value);
+createKabChart(kabTypeSel.value);
+
+function monthKey(dateStr){ return dateStr.slice(0,7); } // YYYY-MM
+function yearKey(dateStr){ return dateStr.slice(0,4); }
+function addMonths(ym, delta){ // ym 'YYYY-MM'
+  const [y,m]=ym.split('-').map(Number); const d=new Date(y, m-1+delta, 1);
+  return d.toISOString().slice(0,7);
+}
+function generateMonthRange(startYM, endYM){
+  if(!startYM || !endYM) return [];
+  let cur=startYM; const arr=[];
+  while(cur<=endYM){ arr.push(cur); cur=addMonths(cur,1); }
+  return arr;
+}
+function generateYearRange(startY, endY){
+  if(!startY || !endY) return [];
+  const s=+startY, e=+endY; const arr=[];
+  for(let y=s; y<=e; y++){ arr.push(String(y)); }
+  return arr;
+}
+// auto defaults for month range based on data
+function inferMonthRange(data){
+  let min=null, max=null;
+  data.forEach(d=>{
+    const dt=getRecordDate(d); if(!dt) return;
+    const m=monthKey(dt);
+    if(!min || m<min) min=m;
+    if(!max || m>max) max=m;
+  });
+  return [min,max];
+}
+function inferYearRange(data){
+  let min=null, max=null;
+  data.forEach(d=>{
+    const dt=getRecordDate(d); if(!dt) return;
+    const y=yearKey(dt);
+    if(!min || y<min) min=y;
+    if(!max || y>max) max=y;
+  });
+  return [min,max];
+}
 
 // =====================
-// PETA CHOROPLETH
+// UPDATE CHARTS (tren + kab/kota)
+// =====================
+function updateCharts(){
+  const arr=loadCases();
+  // Filter prov/kab
+  const selProv=fProv.value||"";
+  const selKab=fKab.value||"";
+  let filtered=arr.filter(d=>{
+    if(selProv && d.prov!==selProv) return false;
+    if(selKab && d.kab!==selKab) return false;
+    return true;
+  });
+
+  // === Trend aggregation ===
+  const gran=trendGranSel.value; // 'month' | 'year'
+  let labels=[], series=[];
+
+  if(gran==='month'){
+    // Determine month range (use inputs or infer from data)
+    let start=fStart.value, end=fEnd.value;
+    if(!start || !end){
+      const [infS, infE]=inferMonthRange(filtered.length?filtered:arr);
+      start = start || infS;
+      end   = end   || infE;
+      // also set UI once if empty
+      if(!fStart.value && start) fStart.value = start;
+      if(!fEnd.value   && end)   fEnd.value   = end;
+    }
+    labels = generateMonthRange(start, end);
+    const perMonth={}; filtered.forEach(d=>{ const dt=getRecordDate(d); if(!dt) return; const k=monthKey(dt); perMonth[k]=(perMonth[k]||0)+1; });
+    series = labels.map(k=>perMonth[k]||0);
+  }else{ // year
+    let ys=yStart.value, ye=yEnd.value;
+    if(!ys || !ye){
+      const [infS, infE]=inferYearRange(filtered.length?filtered:arr);
+      ys = ys || infS; ye = ye || infE;
+      if(!yStart.value && ys) yStart.value = ys;
+      if(!yEnd.value   && ye) yEnd.value   = ye;
+    }
+    labels = generateYearRange(ys, ye);
+    const perYear={}; filtered.forEach(d=>{ const dt=getRecordDate(d); if(!dt) return; const k=yearKey(dt); perYear[k]=(perYear[k]||0)+1; });
+    series = labels.map(k=>perYear[k]||0);
+  }
+
+  // Re-create trend chart if type changed
+  const wantType = trendTypeSel.value;
+  if(!trendChart || trendChart.config.type!==wantType){ createTrendChart(wantType); }
+  trendChart.data.labels = labels;
+  trendChart.data.datasets[0].data = series;
+  trendChart.update();
+
+  // === Kab/Kota chart ===
+  const perKab={};
+  filtered.forEach(d=>{
+    const kk=d.kab || '(Tidak diisi)';
+    const dt=getRecordDate(d);
+    // respect time filters when month granularity selected
+    if(gran==='month' && fStart.value && fEnd.value && dt){
+      const mk=monthKey(dt);
+      if(mk < fStart.value || mk > fEnd.value) return;
+    }
+    if(gran==='year' && (yStart.value || yEnd.value) && dt){
+      const yk=yearKey(dt);
+      if(yStart.value && yk < yStart.value) return;
+      if(yEnd.value && yk > yEnd.value) return;
+    }
+    perKab[kk]=(perKab[kk]||0)+1;
+  });
+  let kabLabels=Object.keys(perKab);
+  // If no province selected, show top 10 kab/kota overall
+  if(!selProv){
+    kabLabels = kabLabels.sort((a,b)=>perKab[b]-perKab[a]).slice(0,10);
+  }else{
+    kabLabels = kabLabels.sort();
+  }
+  const kabSeries = kabLabels.map(k=>perKab[k]||0);
+  const wantKabType = kabTypeSel.value;
+  if(!kabChart || kabChart.config.type!==wantKabType){ createKabChart(wantKabType); }
+  kabChart.data.labels = kabLabels;
+  kabChart.data.datasets[0].data = kabSeries;
+  kabChart.update();
+}
+
+// listeners for controls
+document.getElementById('applyFilter').addEventListener('click', updateCharts);
+trendTypeSel.addEventListener('change', updateCharts);
+kabTypeSel.addEventListener('change', updateCharts);
+trendGranSel.addEventListener('change', () => {
+  const byYear = trendGranSel.value==='year';
+  yearRange.style.display = byYear ? '' : 'none';
+  // no forced clearing; keep inputs if user set them
+  updateCharts();
+});
+[fStart,fEnd,yStart,yEnd].forEach(el=> el.addEventListener('change', updateCharts));
+
+// =====================
+// PETA CHOROPLETH (sama seperti sebelumnya)
 // =====================
 function getColor(val){ const v=Number(val)||0; if(v===0) return '#ffffff'; if(v>0&&v<=50) return '#ffc4c4'; if(v>50&&v<=200) return '#ff7a7a'; return '#cc0000'; }
 let map, geojsonLayer; let _labels=[];
@@ -346,10 +462,10 @@ document.getElementById('exportPng')?.addEventListener('click', exportPNG);
 (async function initMap(){ ensureMap(); try{ const data=await loadFromUrl(DEFAULT_GH); renderChoropleth(data); recalcCasesFromLocalAndRefresh(); }catch(err){ console.warn('Auto-load GeoJSON gagal:',err); } })();
 
 // =====================
-// AUTO UPDATE
+// AUTO UPDATE + INIT
 // =====================
 const _root=document.querySelector('main');
-function _autoUpd(){ updateOnset(); updateDefinisiBadge(); }
+function _autoUpd(){ updateOnset(); updateDefinisiBadge(); updateCharts(); }
 _root.addEventListener('input', _autoUpd, true);
 _root.addEventListener('change', _autoUpd, true);
 updateOnset(); updateDefinisiBadge(); renderTable(); renderCounts(); updateCharts();
@@ -372,18 +488,30 @@ function exportToExcel(){ const arr=loadCases(); if(arr.length===0){ alert('Tida
 document.getElementById('exportExcel').addEventListener('click', exportToExcel);
 
 // =====================
-// GOOGLE SHEETS (OPSIONAL)
+// GOOGLE SHEETS (opsional, no-cors)
 // =====================
 async function sendRowToSheets(row){
   if(!SHEETS_URL){ console.warn('SHEETS_URL kosong'); return; }
-  try{ await fetch(SHEETS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:ACCESS_TOKEN,action:'append',row})}); }catch(e){ console.warn('Gagal kirim Sheets:',e); }
+  try{
+    await fetch(SHEETS_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ token: ACCESS_TOKEN, action: 'append', row })
+    });
+  }catch(e){ console.warn('Gagal kirim Sheets:', e); }
 }
 async function sendAllToSheets(){
   if(!SHEETS_URL){ alert('SHEETS_URL belum diisi.'); return; }
   const arr=loadCases(); if(!arr.length){ alert('Tidak ada data.'); return; }
   try{
-    await fetch(SHEETS_URL,{mode:'no-cors',headers:'Content-Type':'text/plain;charset=utf-8',body:JSON.stringify({token:ACCESS_TOKEN,action:'appendBatch',rows:arr.map(flattenCase)})});
-    alert('Sync batch ke Google Sheets terkirim.');
+    await fetch(SHEETS_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ token: ACCESS_TOKEN, action: 'appendBatch', rows: arr.map(flattenCase) })
+    });
+    alert('Permintaan sync telah dikirim (mode no-cors). Cek Sheet Anda.');
   }catch(e){ alert('Gagal sync: '+e); }
 }
 document.getElementById('syncSheets')?.addEventListener('click', sendAllToSheets);

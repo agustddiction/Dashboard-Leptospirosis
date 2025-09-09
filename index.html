@@ -11,7 +11,7 @@
 <!-- Leaflet CSS & JS (CDN) -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-<!-- Render peta ke <canvas> untuk ekspor PNG -->
+<!-- Leaflet Image for PNG export -->
 <script src="https://unpkg.com/leaflet-image/leaflet-image.js"></script>
 </head>
 <body>
@@ -181,29 +181,6 @@
       <div class="footnote">Rentang nilai normal bersifat indikatif; sesuaikan dengan referensi laboratorium setempat.</div>
     </section>
 
-    <section id="status">
-      <h2>Status Akhir Pasien</h2>
-      <div class="grid-3">
-        <div>
-          <label>Status</label>
-          <select id="statusAkhir">
-            <option value="">Pilih...</option>
-            <option value="Sembuh">Sembuh</option>
-            <option value="Perawatan">Masih dalam perawatan</option>
-            <option value="Meninggal">Meninggal</option>
-          </select>
-        </div>
-        <div>
-          <label>Tanggal Status</label>
-          <input id="tglStatus" type="date"/>
-        </div>
-        <div>
-          <label>Pemberian Obat</label>
-          <input id="obat" type="text" placeholder="cth: Doksisiklin, Penicillin, dll."/>
-        </div>
-      </div>
-    </section>
-
     <section id="aksi">
       <div class="row">
         <button class="btn primary" id="simpan">Simpan Kasus</button>
@@ -222,23 +199,23 @@
       <div class="hr"></div>
       <div class="sticky-filters">
         <div class="row">
-          <div style="flex:1; min-width:180px">
+          <div class="group" style="flex:1; min-width:180px">
             <label>Filter Provinsi</label>
             <select id="fProv"></select>
           </div>
-          <div style="flex:1; min-width:180px">
+          <div class="group" style="flex:1; min-width:180px">
             <label>Filter Kabupaten/Kota</label>
             <select id="fKab"></select>
           </div>
-          <div style="flex:1; min-width:180px">
+          <div class="group" style="flex:1; min-width:180px">
             <label>Dari Bulan</label>
             <input id="fStart" type="month"/>
           </div>
-          <div style="flex:1; min-width:180px">
+          <div class="group" style="flex:1; min-width:180px">
             <label>Sampai Bulan</label>
             <input id="fEnd" type="month"/>
           </div>
-          <div style="align-self:flex-end">
+          <div class="group" style="align-self:flex-end">
             <button class="btn" id="applyFilter">Terapkan</button>
           </div>
         </div>
@@ -255,15 +232,47 @@
 
     <section id="grafik">
       <h2>Analisis & Grafik</h2>
-      <div class="row" style="flex-direction:column; gap:16px">
-        <div>
-          <label class="muted">Tren kasus per bulan</label>
-          <canvas id="trendChart" height="120"></canvas>
+
+      <div class="controls">
+        <div class="group" style="min-width:160px">
+          <label>Jenis Grafik Tren</label>
+          <select id="trendType">
+            <option value="line">Garis (Line)</option>
+            <option value="bar">Batang (Bar)</option>
+          </select>
         </div>
-        <div>
-          <label class="muted">Sebaran kasus per kabupaten/kota</label>
-          <canvas id="kabChart" height="120"></canvas>
+        <div class="group" style="min-width:160px">
+          <label>Granularitas Tren</label>
+          <select id="trendGran">
+            <option value="month">Per Bulan</option>
+            <option value="year">Per Tahun</option>
+          </select>
         </div>
+        <div class="group" id="yearRange" style="display:none; min-width:220px">
+          <label>Rentang Tahun</label>
+          <div class="row" style="gap:6px">
+            <input type="number" id="yStart" placeholder="Awal" min="2000" style="max-width:100px">
+            <input type="number" id="yEnd" placeholder="Akhir" min="2000" style="max-width:100px">
+          </div>
+          <div class="small-note">Jika kosong, otomatis dari data.</div>
+        </div>
+        <div class="group" style="min-width:160px">
+          <label>Jenis Grafik Kab/Kota</label>
+          <select id="kabType">
+            <option value="bar">Batang (Bar)</option>
+            <option value="line">Garis (Line)</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label class="muted">Tren kasus (otomatis mengikuti filter di atas)</label>
+        <canvas id="trendChart" height="120"></canvas>
+      </div>
+      <div style="margin-top:16px">
+        <label class="muted">Sebaran kasus per kabupaten/kota</label>
+        <canvas id="kabChart" height="120"></canvas>
+        <div class="small-note">Jika provinsi tidak dipilih, akan ditampilkan 10 kab/kota dengan kasus terbanyak dari seluruh data.</div>
       </div>
     </section>
 

@@ -1,12 +1,16 @@
-# Leptospirosis Dashboard + Peta Choropleth (GitHub Pages)
-- Token gate — klik *Masuk* atau tekan **Enter**.
-- Peta di bagian paling bawah, **background putih**, auto-load GeoJSON provinsi dari:
-  https://raw.githubusercontent.com/agustddiction/Dashboard-Leptospirosis/main/data/provinsi.json
-- **Export PNG** peta (gradiasi sesuai jumlah kasus).
-- Data kab/kota di `data/kabkota.json` (bisa dilengkapi).
+# Leptospirosis Dashboard — Chart Fix
+Perbaikan & fitur:
+- Tren kasus mendukung **per Bulan** atau **per Tahun** (granularitas bisa dipilih).
+- Bisa ganti **jenis grafik** (Line/Batang) untuk **Tren** dan **Kab/Kota**.
+- Filter waktu: rentang **bulan** (YYYY-MM) atau **tahun** (start–end).
+- Filter **Provinsi** dan **Kab/Kota** ikut tersaring ke grafik.
+- Range bulan/tahun **otomatis terbentuk** dari data jika input kosong.
+- Jika Provinsi tidak dipilih, grafik Kab/Kota menampilkan **Top 10** dari keseluruhan.
 
-## Deploy
-1. Upload semua file ke branch `main` di GitHub.
-2. Settings → Pages → Build and deployment: GitHub Actions.
-3. Buka URL Pages (otomatis dari workflow).
+Cara pakai:
+1. Upload semua file ke repo GitHub (branch `main`). Pages via Actions sudah disiapkan.
+2. (Opsional) Hubungkan ke Google Sheets: isi `SHEETS_URL` di `script.js`, deploy `apps_script.gs`.
 
+Catatan:
+- Data tanggal grafik mengambil `onset`, jika kosong jatuh ke `tglPaparan`, lalu `savedAt`.
+- Tombol **Apply** dan perubahan pada kontrol akan **langsung** menyegarkan grafik.
