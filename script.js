@@ -4,7 +4,7 @@
 // =====================
 const ACCESS_TOKEN = 'ZOOLEPTO123';
 const DEFAULT_GH = 'https://raw.githubusercontent.com/agustddiction/Dashboard-Leptospirosis/main/provinsi.json';
-const SHEETS_URL = ''; // isi Web App URL jika ingin sync ke Google Sheets
+const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbxFHgRel9-LTQTc0YIjy5G22BWk1RiqUjjDqCd8XE1Q4tF8h4t5r8X9WL-MwVZ2IyyYHg/exec';
 
 // =====================
 // TOKEN GATE
