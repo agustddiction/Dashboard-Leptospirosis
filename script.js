@@ -1,8 +1,5 @@
 
 // =====================
-// KONFIGURASI
-
-// =====================
 // UUID helpers
 // =====================
 function genUUID(){
@@ -14,6 +11,8 @@ function genUUID(){
 }
 let editingUUID = null;
 
+// =====================
+// KONFIGURASI
 // =====================
 const ACCESS_TOKEN = 'ZOOLEPTO123';
 const DEFAULT_GH = 'https://raw.githubusercontent.com/agustddiction/Dashboard-Leptospirosis/main/provinsi.json';
