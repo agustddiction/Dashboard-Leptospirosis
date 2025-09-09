@@ -3,7 +3,7 @@
 // KONFIG
 // =====================
 const ACCESS_TOKEN = 'ZOOLEPTO123';
-const DEFAULT_GH = 'https://raw.githubusercontent.com/agustddiction/Dashboard-Leptospirosis/main/provinsi.json'; // RAW only
+const DEFAULT_GH = 'https://raw.githubusercontent.com/agustddiction/Dashboard-Leptospirosis/main/data/provinsi.json'; // RAW only
 
 // =====================
 // TOKEN GATE (klik & Enter, +auto unlock via ?token=)
@@ -498,7 +498,7 @@ exportPngBtn?.addEventListener('click', exportPNG);
 (async function initMap(){
   ensureMap();
   try{
-    const data = await loadFromUrl('https://raw.githubusercontent.com/agustddiction/Dashboard-Leptospirosis/main/provinsi.json');
+    const data = await loadFromUrl('https://raw.githubusercontent.com/agustddiction/Dashboard-Leptospirosis/main/data/provinsi.json');
     renderChoropleth(data);
     recalcCasesFromLocalAndRefresh();
   }catch(err){ console.warn('Auto-load GeoJSON gagal:', err); }
