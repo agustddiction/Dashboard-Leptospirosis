@@ -13,6 +13,9 @@ const REQUIRE_TOKEN_EVERY_LOAD = true;
 const SPREADSHEET_ID = 'GANTI_DENGAN_ID_SHEET_ANDA';
 const SHEET_NAME = 'Kasus';
 const SHEETS_READ_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json`;
+// Auto tarik data
+const AUTO_PULL = true; // aktifkan auto-pull
+const AUTO_PULL_INTERVAL_MS = 5 * 60 * 1000; // setiap 5 menit
 
 
 // =====================
@@ -45,8 +48,7 @@ function autoUnlockFromURL(){ try{ const t=new URLSearchParams(location.search).
   document.getElementById('unlockBtn')?.addEventListener('click', verifyToken);
   document.addEventListener('keydown', e=>{ const lock=document.getElementById('lock'); if(lock && !lock.classList.contains('hidden') && e.key==='Enter') verifyToken(); });
   autoUnlockFromURL();
-  document.getElementById('forceLogin')?.addEventListener('click', ()=>{
-    try{ localStorage.removeItem('lepto_token_ok'); }catch(_){}
+  }catch(_){}
     showLock();
   });
 
@@ -597,6 +599,111 @@ async function pullFromSheets(){
     console.error('pullFromSheets error', e);
     alert('Gagal menarik data dari Google Sheet. Pastikan Sheet di-publish ke web (File → Share → Publish to web).');
   }
+}
+
+function setPullStatus(msg){ const el=document.getElementById('pullStatus'); if(el) el.textContent=msg||''; }
+function parseGVizJSON(text){
+  const start=text.indexOf('{'); const end=text.lastIndexOf('}');
+  if(start<0||end<0) throw new Error('Format GViz tidak dikenali');
+  const json=JSON.parse(text.slice(start,end+1));
+  const table=json.table;
+  const headers=(table.cols||[]).map(c=>c.label||c.id);
+  const rows=(table.rows||[]).map(r=>(r.c||[]).map(c=>c?(c.v??''):''));
+  return rows.map(vals=>{ const o={}; headers.forEach((h,i)=>o[h]=vals[i]); return o; });
+}
+function flatToCase(r){
+  return {
+    nama: r['Nama']||'',
+    jk: r['Jenis Kelamin']||'',
+    umur: r['Umur']||'',
+    kerja: r['Pekerjaan']||'',
+    prov: r['Provinsi']||'',
+    kab: r['Kab/Kota']||'',
+    alamat: r['Alamat']||'',
+    onset: r['Onset']||'',
+    tglPaparan: r['Tanggal Paparan']||'',
+    gejala: {}, gejalaTgl: {},
+    paparan: [],
+    lab: {
+      leukosit: r['Leukosit (x10^3/µL)']||'',
+      trombosit: r['Trombosit (x10^3/µL)']||'',
+      bilirubin: r['Bilirubin (mg/dL)']||'',
+      sgot: r['SGOT (U/L)']||'',
+      sgpt: r['SGPT (U/L)']||'',
+      kreatinin: r['Kreatinin (mg/dL)']||'',
+      amilase: r['Amilase (U/L)']||'',
+      cpk: r['CPK (U/L)']||'',
+      proteinuria: (r['Proteinuria']||'')==='Ya',
+      hematuria: (r['Hematuria']||'')==='Ya',
+      rdt: ((r['RDT']||'').toLowerCase().startsWith('pos')?'pos':((r['RDT']||'').toLowerCase().startsWith('neg')?'neg':'nd')),
+      mat: ((r['MAT']||'').toLowerCase().startsWith('pos')?'pos':((r['MAT']||'').toLowerCase().startsWith('neg')?'neg':'nd')),
+      pcr: ((r['PCR']||'').toLowerCase().startsWith('pos')?'pos':((r['PCR']||'').toLowerCase().startsWith('neg')?'neg':'nd')),
+      serovar: r['Serovar']||''
+    },
+    definisi: r['Definisi']||'',
+    statusAkhir: r['Status Akhir']||'',
+    tglStatus: r['Tanggal Status']||'',
+    obat: r['Obat']||'',
+    savedAt: r['Saved At']||new Date().toISOString()
+  };
+}
+function mergeCases(localArr, remoteArr){
+  const byKey = new Map();
+  const toDate = s => { try{ return new Date(s); }catch(_){ return new Date(0);} };
+  // seed with local
+  localArr.forEach(d=>{ byKey.set(duplicateKey(d), d); });
+  // merge remote (newer wins)
+  remoteArr.forEach(r=>{
+    const k=duplicateKey(r);
+    if(!byKey.has(k)){ byKey.set(k, r); }
+    else {
+      const a=byKey.get(k);
+      const tA = toDate(a.savedAt||a.tglStatus||a.onset||'1970-01-01');
+      const tB = toDate(r.savedAt||r.tglStatus||r.onset||'1970-01-01');
+      if(tB>tA) byKey.set(k, r);
+    }
+  });
+  return Array.from(byKey.values());
+}
+
+// Ganti pullFromSheets: support {merge:true|false} dan tanpa alert saat auto
+async function pullFromSheets(opts={merge:true, silent:false}){
+  if(!SPREADSHEET_ID || SPREADSHEET_ID.startsWith('GANTI_')){
+    if(!opts.silent) alert('SPREADSHEET_ID belum diisi di script.js');
+    return;
+  }
+  try{
+    const res = await fetch(SHEETS_READ_URL, { mode:'cors', cache:'no-store' });
+    const text = await res.text();
+    const flat = parseGVizJSON(text);
+    const remoteCases = flat.map(flatToCase);
+    if(opts.merge){
+      const local = loadCases();
+      const merged = mergeCases(local, remoteCases);
+      saveCases(merged);
+    } else {
+      saveCases(remoteCases);
+    }
+    renderTable(); renderCounts(); updateCharts(); recalcCasesFromLocalAndRefresh();
+    const now = new Date().toLocaleString('id-ID');
+    setPullStatus(`Tarik otomatis OK • ${now}`);
+    if(!opts.silent) alert('Data dari Google Sheet sudah dimuat/di-merge.');
+  }catch(e){
+    console.error('pullFromSheets error', e);
+    setPullStatus('Gagal tarik otomatis (cek publish Sheet & ID)');
+    if(!opts.silent) alert('Gagal menarik data dari Google Sheet. Pastikan Sheet di-publish ke web (File → Share → Publish to web).');
+  }
+}
+document.getElementById('pullSheets')?.addEventListener('click', ()=>pullFromSheets({merge:true, silent:false}));
+
+// Jadwal auto-pull setelah login
+let _autoTimer = null;
+async function scheduleAutoPull(){
+  if(!AUTO_PULL) return;
+  // Tarik pertama kali segera (silent, merge)
+  await pullFromSheets({merge:true, silent:true});
+  if(_autoTimer) clearInterval(_autoTimer);
+  _autoTimer = setInterval(()=>pullFromSheets({merge:true, silent:true}), AUTO_PULL_INTERVAL_MS);
 }
 document.getElementById('pullSheets')?.addEventListener('click', pullFromSheets);
 
