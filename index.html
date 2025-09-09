@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Dashboard Leptospirosis — Pencatatan Kasus</title>
-<!-- Chart.js CDN -->
+<title>Dashboard Leptospirosis — Pencatatan Kasus + Peta Choropleth</title>
+<!-- Chart.js & XLSX -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <!-- Leaflet CSS & JS (CDN) -->
@@ -12,6 +12,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <!-- Render peta ke <canvas> untuk ekspor PNG -->
 <script src="https://unpkg.com/leaflet-image/leaflet-image.js"></script>
+
 <style>
   :root{
     --bg:#ffffff;
@@ -29,7 +30,7 @@
     font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji";
   }
   header{
-    position:sticky; top:0; z-index:5; background:rgba(255,255,255,.85); backdrop-filter:saturate(180%) blur(8px);
+    position:sticky; top:0; z-index:5; background:rgba(255,255,255,.9); backdrop-filter:saturate(180%) blur(8px);
     border-bottom:1px solid var(--line);
   }
   .wrap{max-width:980px; margin:0 auto; padding:14px 18px;}
@@ -37,13 +38,15 @@
   .sub{font-size:12px; color:var(--muted)}
   .badge{
     position:absolute; right:18px; top:14px;
-    font-size:12px; border:1px solid var(--line); padding:6px 10px; border-radius:999px; background:#fff; 
-    letter-spacing:.2px;
+    font-size:12px; border:1px solid var(--line); padding:6px 10px; border-radius:999px; background:#fff; letter-spacing:.2px;
   }
+  .badge.ok{ border-color: var(--ok); background: var(--ok); color:#fff; }
+  .badge.warn{ border-color: var(--warn); background: var(--warn); color:#fff; }
+  .badge.bad{ border-color: var(--bad); background: var(--bad); color:#fff; }
+  .badge.neutral{ border-color: var(--line); background:#fff; color:#111; }
+
   main{max-width:980px; margin:0 auto; padding:18px}
-  section{
-    border:1px solid var(--line); border-radius:14px; padding:16px 14px; margin:14px 0; background:#fff;
-  }
+  section{ border:1px solid var(--line); border-radius:14px; padding:16px 14px; margin:14px 0; background:#fff; }
   section h2{font-size:16px; margin:0 0 12px}
   .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:10px}
   .grid-3{display:grid; grid-template-columns:repeat(3,1fr); gap:10px}
@@ -56,20 +59,15 @@
   textarea{min-height:70px; resize:vertical}
   .muted{color:var(--muted); font-size:12px}
   .row{display:flex; gap:10px; flex-wrap:wrap}
-  .btn{
-    appearance:none; border:1px solid var(--line); background:#fff; color:#111; padding:9px 12px; border-radius:10px; cursor:pointer;
-  }
+  .btn{ appearance:none; border:1px solid var(--line); background:#fff; color:#111; padding:9px 12px; border-radius:10px; cursor:pointer; }
   .btn:hover{background:#f7f7f7}
   .btn.primary{background:#111; color:#fff; border-color:#111}
   .btn.destructive{border-color:var(--bad); color:#fff; background:var(--bad)}
-  .btn.ghost{background:transparent}
   .hr{height:1px; background:var(--line); margin:12px 0}
   .symptom{display:flex; align-items:center; gap:8px; padding:6px 8px; border:1px solid var(--line); border-radius:10px}
   .symptom input[type=date]{margin-left:auto; width:155px}
   .hidden{display:none}
-  .table{
-    width:100%; border-collapse:collapse; font-size:13px; 
-  }
+  .table{ width:100%; border-collapse:collapse; font-size:13px; }
   .table th, .table td{border-bottom:1px solid var(--line); padding:8px 6px; text-align:left; vertical-align:top}
   .tag{display:inline-flex; align-items:center; gap:6px; padding:3px 8px; border-radius:999px; border:1px solid var(--line); font-size:11px}
   .tag.ok{border-color:var(--ok); color:var(--ok)}
@@ -83,20 +81,12 @@
   .case-counts{display:flex; gap:8px; flex-wrap:wrap}
   .case-counts .tag{font-weight:600}
   .small{font-size:12px}
-  /* Badge color states */
-  .badge.ok{ border-color: var(--ok); background: var(--ok); color:#fff; }
-  .badge.warn{ border-color: var(--warn); background: var(--warn); color:#fff; }
-  .badge.bad{ border-color: var(--bad); background: var(--bad); color:#fff; }
-  .badge.neutral{ border-color: var(--line); background:#fff; color:#111; }
-  /* Radio pill choices */
-  .choices{display:flex; flex-wrap:wrap; gap:8px}
-  .choice{display:inline-flex; align-items:center; gap:8px; border:1px solid var(--line); border-radius:999px; padding:6px 12px; cursor:pointer; user-select:none; min-height:34px; line-height:1.2}
-.choice input{width:16px; height:16px; margin:0; accent-color:#111}
-  .choice input{accent-color:#111}
-  /* Override: keep radio groups in one line and compact */
+
+  /* Radio pill choices (RDT/MAT/PCR) */
   .choices{display:flex; gap:8px; flex-wrap:nowrap; white-space:nowrap; align-items:center; overflow:auto}
   .choice{display:inline-flex; align-items:center; gap:8px; border:1px solid var(--line); border-radius:999px; padding:4px 10px; cursor:pointer; user-select:none; min-height:30px; line-height:1.2; font-size:12px}
   .choice input{width:14px; height:14px; margin:0; accent-color:#111}
+
   /* Lock screen */
   body.locked{overflow:hidden}
   .lock{position:fixed; inset:0; z-index:9999; background:#ffffff; display:flex; align-items:center; justify-content:center; padding:24px}
@@ -106,67 +96,18 @@
   .lock-row{display:flex; gap:10px; align-items:center}
   .lock-row input[type=text]{flex:1}
   .lock-err{display:none; color:var(--bad); font-size:12px; margin-top:10px}
-  <style>
-:root{ --line:#e5e7eb; --fg:#111; --muted:#6b7280; }
-*{box-sizing:border-box}
-body{ margin:0; font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; color:var(--fg); background:#fff }
-header{ padding:16px 18px; border-bottom:1px solid var(--line) }
-h1{ font-size:18px; margin:0 0 4px }
-.sub{ font-size:12px; color:var(--muted) }
-main{ padding:16px 18px; max-width:1200px; margin:0 auto }
-.row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:10px 0 14px }
-.btn{ appearance:none; border:1px solid var(--line); background:#fff; color:#111; padding:8px 12px; border-radius:10px; cursor:pointer }
-input[type=file], input[type=url]{ font-size:14px }
-#map{ height:520px; width:100%; border:1px solid var(--line); border-radius:12px }
-@media (max-width:600px){ #map{ height:360px } }
-.legend{ background:#fff; border:1px solid var(--line); border-radius:8px; padding:8px 10px; line-height:1.2; font-size:12px }
-.legend-title{ font-weight:700; margin-bottom:6px }
-.legend-row{ display:flex; align-items:center; gap:8px; margin:4px 0 }
-.swatch{ width:14px; height:14px; border-radius:3px; border:1px solid var(--line); display:inline-block }
-.leaflet-tooltip.prov-label{ background:transparent; border:none; box-shadow:none; color:#333; font-weight:700; font-size:12px; text-shadow:0 0 2px #fff }
-.footnote{ font-size:12px; color:var(--muted); margin-top:8px }
-.leaflet-interactive{ cursor:pointer }
-</style>
-<style>
-:root{ --line:#e5e7eb; --fg:#111; --muted:#6b7280; }
-*{box-sizing:border-box}
-body{ margin:0; font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; color:var(--fg); background:#fff }
-header{ padding:16px 18px; border-bottom:1px solid var(--line) }
-h1{ font-size:18px; margin:0 0 4px }
-.sub{ font-size:12px; color:var(--muted) }
-main{ padding:16px 18px; max-width:1200px; margin:0 auto }
-.row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:10px 0 14px }
-.btn{ appearance:none; border:1px solid var(--line); background:#fff; color:#111; padding:8px 12px; border-radius:10px; cursor:pointer }
-input[type=file], input[type=url]{ font-size:14px }
-#map{ height:520px; width:100%; border:1px solid var(--line); border-radius:12px }
-@media (max-width:600px){ #map{ height:360px } }
-.legend{ background:#fff; border:1px solid var(--line); border-radius:8px; padding:8px 10px; line-height:1.2; font-size:12px }
-.legend-title{ font-weight:700; margin-bottom:6px }
-.legend-row{ display:flex; align-items:center; gap:8px; margin:4px 0 }
-.swatch{ width:14px; height:14px; border-radius:3px; border:1px solid var(--line); display:inline-block }
-.leaflet-tooltip.prov-label{ background:transparent; border:none; box-shadow:none; color:#333; font-weight:700; font-size:12px; text-shadow:0 0 2px #fff }
-.footnote{ font-size:12px; color:var(--muted); margin-top:8px }
-.leaflet-interactive{ cursor:pointer }
+
+  /* Peta */
+  #map{ height:520px; width:100%; border:1px solid var(--line); border-radius:12px }
+  @media (max-width:600px){ #map{ height:360px } }
+  .legend{ background:#fff; border:1px solid var(--line); border-radius:8px; padding:8px 10px; line-height:1.2; font-size:12px }
+  .legend-title{ font-weight:700; margin-bottom:6px }
+  .legend-row{ display:flex; align-items:center; gap:8px; margin:4px 0 }
+  .swatch{ width:14px; height:14px; border-radius:3px; border:1px solid var(--line); display:inline-block }
+  .leaflet-tooltip.prov-label{ background:transparent; border:none; box-shadow:none; color:#333; font-weight:700; font-size:12px; text-shadow:0 0 2px #fff }
+  .leaflet-interactive{ cursor:pointer }
 </style>
 </head>
-<body>
-<header>
-<h1 aria-label="Judul peta">Sebaran Jumlah Kasus Leptospirosis per Provinsi, Indonesia</h1>
-<div class="sub">Contoh data — ganti dengan data aktual</div>
-</header>
-<main>
-<div class="row">
-<input id="ghUrl" type="url" aria-label="URL RAW GeoJSON provinsi Indonesia"
-placeholder="https://raw.githubusercontent.com/agustddiction/Dashboard-Leptospirosis/main/provinsi.json"
-style="flex:1; min-width:260px; padding:8px 10px; border:1px solid var(--line); border-radius:10px">
-<button id="loadGithub" class="btn" title="Muat GeoJSON dari URL GitHub RAW">Muat GeoJSON</button>
-<label for="gj" class="btn" title="Unggah file GeoJSON lokal">Unggah GeoJSON</label>
-<input id="gj" type="file" accept=".geojson,.json,application/json" aria-label="Unggah GeoJSON provinsi" style="display:none"/>
-<button id="exportPng" class="btn" title="Ekspor peta sebagai PNG">Export PNG</button>
-</div>
-<div id="map" aria-label="Peta persebaran kasus per provinsi"></div>
-<div class="footnote">Cara update data: ubah nilai pada objek <code>casesByProvince</code> di bawah; warna akan menyesuaikan otomatis.</div>
-</main>
 <body>
   <!-- Lock Screen -->
   <div id="lock" class="lock hidden">
@@ -180,15 +121,33 @@ style="flex:1; min-width:260px; padding:8px 10px; border:1px solid var(--line); 
       <div id="lockErr" class="lock-err">Token salah. Coba lagi.</div>
     </div>
   </div>
+
   <header>
     <div class="wrap" style="position:relative">
       <h1>Dashboard Pencatatan Kasus Leptospirosis</h1>
       <div class="sub">Tema monokrom • Satu kolom memanjang • Data tersimpan lokal (browser)</div>
-      <div class="badge" id="defBadge">Definisi Kasus: —</div>
+      <div class="badge neutral" id="defBadge">Definisi Kasus: —</div>
     </div>
   </header>
 
   <main>
+    <!-- SECTION: Peta Choropleth -->
+    <section id="peta">
+      <h2 aria-label="Judul peta">Sebaran Jumlah Kasus Leptospirosis per Provinsi, Indonesia</h2>
+      <div class="sub" style="margin-top:-6px">Contoh data — ganti dengan data aktual</div>
+      <div class="row" style="margin-top:12px">
+        <input id="ghUrl" type="url" aria-label="URL RAW GeoJSON provinsi Indonesia"
+                placeholder="https://raw.githubusercontent.com/agustddiction/Dashboard-Leptospirosis/main/provinsi.json"
+                style="flex:1; min-width:260px; padding:8px 10px; border:1px solid var(--line); border-radius:10px">
+        <button id="loadGithub" class="btn" title="Muat GeoJSON dari URL GitHub RAW">Muat GeoJSON</button>
+        <label for="gj" class="btn" title="Unggah file GeoJSON lokal">Unggah GeoJSON</label>
+        <input id="gj" type="file" accept=".geojson,.json,application/json" aria-label="Unggah GeoJSON provinsi" style="display:none"/>
+        <button id="exportPng" class="btn" title="Ekspor peta sebagai PNG">Export PNG</button>
+      </div>
+      <div id="map" aria-label="Peta persebaran kasus per provinsi"></div>
+      <div class="footnote">Cara update data: ubah nilai pada objek <code>casesByProvince</code> di bawah; atau otomatis dihitung dari data tersimpan.</div>
+    </section>
+
     <section id="pasien">
       <h2>Data Pasien</h2>
       <div class="grid-2">
@@ -228,7 +187,7 @@ style="flex:1; min-width:260px; padding:8px 10px; border:1px solid var(--line); 
     <section id="gejala">
       <h2>Riwayat Gejala</h2>
       <div class="muted small">Centang gejala yang muncul. Jika dicentang, isi tanggal munculnya gejala. Onset otomatis diambil dari tanggal gejala paling awal.</div>
-      <div class="grid-2" id="gejalaGrid"><!-- injected --></div>
+      <div class="grid-2" id="gejalaGrid"></div>
       <div class="hr"></div>
       <div class="row">
         <div><span class="muted">Tanggal onset (otomatis)</span></div>
@@ -245,7 +204,7 @@ style="flex:1; min-width:260px; padding:8px 10px; border:1px solid var(--line); 
         </div>
       </div>
       <label class="muted">Centang faktor risiko dalam 2 minggu terakhir</label>
-      <div class="grid-2" id="paparanGrid"><!-- injected --></div>
+      <div class="grid-2" id="paparanGrid"></div>
     </section>
 
     <section id="lab">
@@ -366,6 +325,7 @@ style="flex:1; min-width:260px; padding:8px 10px; border:1px solid var(--line); 
         <button class="btn" id="cekDup">Cek Duplikat</button>
         <button class="btn destructive" id="hapusDup">Hapus Duplikat</button>
         <button class="btn" id="exportExcel">Ekspor Excel</button>
+        <button class="btn" id="recalcMap">Hitung Peta dari Data</button>
       </div>
     </section>
 
@@ -410,23 +370,25 @@ style="flex:1; min-width:260px; padding:8px 10px; border:1px solid var(--line); 
       <h2>Analisis & Grafik</h2>
       <div class="row" style="flex-direction:column; gap:16px">
         <div>
-          <label class="muted">Tren kasus per bulan (baris 1)</label>
+          <label class="muted">Tren kasus per bulan</label>
           <canvas id="trendChart" height="120"></canvas>
         </div>
         <div>
-          <label class="muted">Sebaran kasus per kabupaten/kota (baris 2)</label>
+          <label class="muted">Sebaran kasus per kabupaten/kota</label>
           <canvas id="kabChart" height="120"></canvas>
         </div>
       </div>
     </section>
 
     <footer class="wrap" style="padding-bottom:48px">
-      <div class="footnote">Data disimpan di <em>localStorage</em> perangkat Anda. Ekspor/Integrasi (Google Sheets/API) dapat ditambahkan kemudian.</div>
+      <div class="footnote">Data disimpan di <em>localStorage</em> perangkat Anda. Peta dapat dihitung otomatis dari data tersimpan atau dari objek <code>casesByProvince</code>. Ekspor/Integrasi (Google Sheets/API) dapat ditambahkan kemudian.</div>
     </footer>
   </main>
 
 <script>
-// === TOKEN GATE ===
+/* =====================
+   TOKEN GATE (klik & Enter, +auto unlock via ?token=)
+   ===================== */
 const ACCESS_TOKEN = 'ZOOLEPTO123';
 function showLock(){
   const lock = document.getElementById('lock');
@@ -446,58 +408,39 @@ function verifyToken(){
     if(err){ err.textContent='Token salah. Coba lagi.'; err.style.display='block'; }
   }
 }
+function autoUnlockFromURL(){
+  try{
+    const usp = new URLSearchParams(location.search);
+    const t = usp.get('token');
+    if(t && t === ACCESS_TOKEN){ localStorage.setItem('lepto_token_ok','1'); hideLock(); }
+  }catch(_){}
+}
 (function(){
   const ok = localStorage.getItem('lepto_token_ok')==='1';
   if(!ok) showLock();
-  const btn = document.getElementById('unlockBtn');
-  if(btn) btn.addEventListener('click', verifyToken);
+  document.getElementById('unlockBtn')?.addEventListener('click', verifyToken);
   document.addEventListener('keydown', (e)=>{
     const lock = document.getElementById('lock');
     if(lock && !lock.classList.contains('hidden') && e.key==='Enter') verifyToken();
   });
+  autoUnlockFromURL();
 })();
 
 /** =========================
- *  DATA MASTER PROV-KAB (contoh ringkas; perlu dilengkapi)
- *  Untuk daftar lengkap, ganti konstanta ini dengan JSON lengkap provinsi→kab/kota.
+ *  DATA MASTER PROV-KAB (contoh ringkas; bisa dilengkapi)
  *  ========================= */
 const PROV_KAB = {
-      "Aceh": ["Kabupaten Aceh Barat","Kabupaten Aceh Barat Daya","Kabupaten Aceh Besar","Kabupaten Aceh Jaya","Kabupaten Aceh Selatan","Kabupaten Aceh Singkil","Kabupaten Aceh Tamiang","Kabupaten Aceh Tengah","Kabupaten Aceh Tenggara","Kabupaten Aceh Timur","Kabupaten Aceh Utara","Kabupaten Bener Meriah","Kabupaten Bireuen","Kabupaten Gayo Lues","Kabupaten Nagan Raya","Kabupaten Pidie","Kabupaten Pidie Jaya","Kabupaten Simeulue","Kota Banda Aceh","Kota Langsa","Kota Lhokseumawe","Kota Sabang","Kota Subulussalam"],
-      "Sumatera Utara": ["Kabupaten Asahan","Kabupaten Batubara","Kabupaten Dairi","Kabupaten Deli Serdang","Kabupaten Humbang Hasundutan","Kabupaten Karo","Kabupaten Labuhanbatu","Kabupaten Labuhanbatu Selatan","Kabupaten Labuhanbatu Utara","Kabupaten Langkat","Kabupaten Mandailing Natal","Kabupaten Nias","Kabupaten Nias Barat","Kabupaten Nias Selatan","Kabupaten Nias Utara","Kabupaten Padang Lawas","Kabupaten Padang Lawas Utara","Kabupaten Pakpak Bharat","Kabupaten Samosir","Kabupaten Serdang Bedagai","Kabupaten Simalungun","Kabupaten Tapanuli Selatan","Kabupaten Tapanuli Tengah","Kabupaten Tapanuli Utara","Kabupaten Toba Samosir","Kota Binjai","Kota Gunungsitoli","Kota Medan","Kota Padangsidempuan","Kota Pematangsiantar","Kota Sibolga","Kota Tanjungbalai","Kota Tebing Tinggi"],
-      "Sumatera Barat": ["Kabupaten Agam","Kabupaten Dharmasraya","Kabupaten Kepulauan Mentawai","Kabupaten Lima Puluh Kota","Kabupaten Padang Pariaman","Kabupaten Pasaman","Kabupaten Pasaman Barat","Kabupaten Pesisir Selatan","Kabupaten Sijunjung","Kabupaten Solok","Kabupaten Solok Selatan","Kabupaten Tanah Datar","Kota Bukittinggi","Kota Padang","Kota Padangpanjang","Kota Pariaman","Kota Payakumbuh","Kota Sawahlunto","Kota Solok"],
-      "Sumatera Selatan": ["Kabupaten Banyuasin","Kabupaten Empat Lawang","Kabupaten Lahat","Kabupaten Muara Enim","Kabupaten Musi Banyuasin","Kabupaten Musi Rawas","Kabupaten Musi Rawas Utara","Kabupaten Ogan Ilir","Kabupaten Ogan Komering Ilir","Kabupaten Ogan Komering Ulu","Kabupaten Ogan Komering Ulu Selatan","Kabupaten Ogan Komering Ulu Timur","Kabupaten Penukal Abab Lematang Ilir","Kota Lubuklinggau","Kota Pagar Alam","Kota Palembang","Kota Prabumulih"],
-      "Riau": ["Kabupaten Bengkalis","Kabupaten Indragiri Hilir","Kabupaten Indragiri Hulu","Kabupaten Kampar","Kabupaten Kepulauan Meranti","Kabupaten Kuantan Singingi","Kabupaten Pelalawan","Kabupaten Rokan Hilir","Kabupaten Rokan Hulu","Kabupaten Siak","Kota Dumai","Kota Pekanbaru"],
-      "Kepulauan Riau": ["Kabupaten Bintan","Kabupaten Karimun","Kabupaten Kepulauan Anambas","Kabupaten Lingga","Kabupaten Natuna","Kota Batam","Kota Tanjung Pinang"],
-      "Jambi": ["Kabupaten Batanghari","Kabupaten Bungo","Kabupaten Kerinci","Kabupaten Merangin","Kabupaten Muaro Jambi","Kabupaten Sarolangun","Kabupaten Tanjung Jabung Barat","Kabupaten Tanjung Jabung Timur","Kabupaten Tebo","Kota Jambi","Kota Sungai Penuh"],
-      "Bengkulu": ["Kabupaten Bengkulu Selatan","Kabupaten Bengkulu Tengah","Kabupaten Bengkulu Utara","Kabupaten Kaur","Kabupaten Kepahiang","Kabupaten Lebong","Kabupaten Mukomuko","Kabupaten Rejang Lebong","Kabupaten Seluma","Kota Bengkulu"],
-      "Bangka Belitung": ["Kabupaten Bangka","Kabupaten Bangka Barat","Kabupaten Bangka Selatan","Kabupaten Bangka Tengah","Kabupaten Belitung","Kabupaten Belitung Timur","Kota Pangkal Pinang"],
-      "Lampung": ["Kabupaten Lampung Tengah","Kabupaten Lampung Utara","Kabupaten Lampung Selatan","Kabupaten Lampung Barat","Kabupaten Lampung Timur","Kabupaten Mesuji","Kabupaten Pesawaran","Kabupaten Pesisir Barat","Kabupaten Pringsewu","Kabupaten Tulang Bawang","Kabupaten Tulang Bawang Barat","Kabupaten Tanggamus","Kabupaten Way Kanan","Kota Bandar Lampung","Kota Metro"],
-      "Banten": ["Kabupaten Lebak","Kabupaten Pandeglang","Kabupaten Serang","Kabupaten Tangerang","Kota Cilegon","Kota Serang","Kota Tangerang","Kota Tangerang Selatan"],
-      "Jawa Barat": ["Kabupaten Bandung","Kabupaten Bandung Barat","Kabupaten Bekasi","Kabupaten Bogor","Kabupaten Ciamis","Kabupaten Cianjur","Kabupaten Cirebon","Kabupaten Garut","Kabupaten Indramayu","Kabupaten Karawang","Kabupaten Kuningan","Kabupaten Majalengka","Kabupaten Pangandaran","Kabupaten Purwakarta","Kabupaten Subang","Kabupaten Sukabumi","Kabupaten Sumedang","Kabupaten Tasikmalaya","Kota Bandung","Kota Banjar","Kota Bekasi","Kota Bogor","Kota Cimahi","Kota Cirebon","Kota Depok","Kota Sukabumi","Kota Tasikmalaya"],
-      "Jawa Tengah": ["Kabupaten Banjarnegara","Kabupaten Banyumas","Kabupaten Batang","Kabupaten Blora","Kabupaten Boyolali","Kabupaten Brebes","Kabupaten Cilacap","Kabupaten Demak","Kabupaten Grobogan","Kabupaten Jepara","Kabupaten Karanganyar","Kabupaten Kebumen","Kabupaten Kendal","Kabupaten Klaten","Kabupaten Kudus","Kabupaten Magelang","Kabupaten Pati","Kabupaten Pekalongan","Kabupaten Pemalang","Kabupaten Purbalingga","Kabupaten Purworejo","Kabupaten Rembang","Kabupaten Semarang","Kabupaten Sragen","Kabupaten Sukoharjo","Kabupaten Tegal","Kabupaten Temanggung","Kabupaten Wonogiri","Kabupaten Wonosobo","Kota Magelang","Kota Pekalongan","Kota Salatiga","Kota Semarang","Kota Surakarta","Kota Tegal"],
-      "Jawa Timur": ["Kabupaten Bangkalan","Kabupaten Banyuwangi","Kabupaten Blitar","Kabupaten Bojonegoro","Kabupaten Bondowoso","Kabupaten Gresik","Kabupaten Jember","Kabupaten Jombang","Kabupaten Kediri","Kabupaten Lamongan","Kabupaten Lumajang","Kabupaten Madiun","Kabupaten Magetan","Kabupaten Malang","Kabupaten Mojokerto","Kabupaten Nganjuk","Kabupaten Ngawi","Kabupaten Pacitan","Kabupaten Pamekasan","Kabupaten Pasuruan","Kabupaten Ponorogo","Kabupaten Probolinggo","Kabupaten Sampang","Kabupaten Sidoarjo","Kabupaten Situbondo","Kabupaten Sumenep","Kabupaten Trenggalek","Kabupaten Tuban","Kabupaten Tulungagung","Kota Batu","Kota Blitar","Kota Kediri","Kota Madiun","Kota Malang","Kota Mojokerto","Kota Pasuruan","Kota Probolinggo","Kota Surabaya"],
-      "DKI Jakarta": ["Kota Administrasi Jakarta Barat","Kota Administrasi Jakarta Pusat","Kota Administrasi Jakarta Selatan","Kota Administrasi Jakarta Timur","Kota Administrasi Jakarta Utara","Kabupaten Administrasi Kepulauan Seribu"],
-      "Daerah Istimewa Yogyakarta": ["Kabupaten Bantul","Kabupaten Gunungkidul","Kabupaten Kulon Progo","Kabupaten Sleman","Kota Yogyakarta"],
-      "Bali": ["Kabupaten Badung","Kabupaten Bangli","Kabupaten Buleleng","Kabupaten Gianyar","Kabupaten Jembrana","Kabupaten Karangasem","Kabupaten Klungkung","Kabupaten Tabanan","Kota Denpasar"],
-      "Nusa Tenggara Barat": ["Kabupaten Bima","Kabupaten Dompu","Kabupaten Lombok Barat","Kabupaten Lombok Tengah","Kabupaten Lombok Timur","Kabupaten Lombok Utara","Kabupaten Sumbawa","Kabupaten Sumbawa Barat","Kota Bima","Kota Mataram"],
-      "Nusa Tenggara Timur": ["Kabupaten Alor","Kabupaten Belu","Kabupaten Ende","Kabupaten Flores Timur","Kabupaten Kupang","Kabupaten Lembata","Kabupaten Malaka","Kabupaten Manggarai","Kabupaten Manggarai Barat","Kabupaten Manggarai Timur","Kabupaten Ngada","Kabupaten Nagekeo","Kabupaten Rote Ndao","Kabupaten Sabu Raijua","Kabupaten Sikka","Kabupaten Sumba Barat","Kabupaten Sumba Barat Daya","Kabupaten Sumba Tengah","Kabupaten Sumba Timur","Kabupaten Timor Tengah Selatan","Kabupaten Timor Tengah Utara","Kota Kupang"],
-      "Kalimantan Barat": ["Kabupaten Bengkayang","Kabupaten Kapuas Hulu","Kabupaten Kayong Utara","Kabupaten Ketapang","Kabupaten Kubu Raya","Kabupaten Landak","Kabupaten Melawi","Kabupaten Mempawah","Kabupaten Sambas","Kabupaten Sanggau","Kabupaten Sekadau","Kabupaten Sintang","Kota Pontianak","Kota Singkawang"],
-      "Kalimantan Selatan": ["Kabupaten Balangan","Kabupaten Banjar","Kabupaten Barito Kuala","Kabupaten Hulu Sungai Selatan","Kabupaten Hulu Sungai Tengah","Kabupaten Hulu Sungai Utara","Kabupaten Kotabaru","Kabupaten Tabalong","Kabupaten Tanah Bumbu","Kabupaten Tanah Laut","Kabupaten Tapin","Kota Banjarbaru","Kota Banjarmasin"],
-      "Kalimantan Tengah": ["Kabupaten Barito Selatan","Kabupaten Barito Timur","Kabupaten Barito Utara","Kabupaten Gunung Mas","Kabupaten Kapuas","Kabupaten Katingan","Kabupaten Kotawaringin Barat","Kabupaten Kotawaringin Timur","Kabupaten Lamandau","Kabupaten Murung Raya","Kabupaten Pulang Pisau","Kabupaten Sukamara","Kabupaten Seruyan","Kota Palangka Raya"],
-      "Kalimantan Timur": ["Kabupaten Berau","Kabupaten Kutai Barat","Kabupaten Kutai Kartanegara","Kabupaten Kutai Timur","Kabupaten Mahakam Ulu","Kabupaten Paser","Kabupaten Penajam Paser Utara","Kota Balikpapan","Kota Bontang","Kota Samarinda"],
-      "Kalimantan Utara": ["Kabupaten Bulungan","Kabupaten Malinau","Kabupaten Nunukan","Kabupaten Tana Tidung","Kota Tarakan"],
-      "Gorontalo": ["Kabupaten Boalemo","Kabupaten Bone Bolango","Kabupaten Gorontalo","Kabupaten Gorontalo Utara","Kabupaten Pohuwato","Kota Gorontalo"],
-      "Sulawesi Selatan": ["Kabupaten Bantaeng","Kabupaten Barru","Kabupaten Bone","Kabupaten Bulukumba","Kabupaten Enrekang","Kabupaten Gowa","Kabupaten Jeneponto","Kabupaten Kepulauan Selayar","Kabupaten Luwu","Kabupaten Luwu Timur","Kabupaten Luwu Utara","Kabupaten Maros","Kabupaten Pangkajene dan Kepulauan","Kabupaten Pinrang","Kabupaten Sidenreng Rappang","Kabupaten Sinjai","Kabupaten Soppeng","Kabupaten Takalar","Kabupaten Tana Toraja","Kabupaten Toraja Utara","Kabupaten Wajo","Kota Makassar","Kota Palopo","Kota Parepare"],
-      "Sulawesi Tenggara": ["Kabupaten Bombana","Kabupaten Buton","Kabupaten Buton Selatan","Kabupaten Buton Tengah","Kabupaten Buton Utara","Kabupaten Kolaka","Kabupaten Kolaka Timur","Kabupaten Kolaka Utara","Kabupaten Konawe","Kabupaten Konawe Kepulauan","Kabupaten Konawe Selatan","Kabupaten Konawe Utara","Kabupaten Muna","Kabupaten Muna Barat","Kabupaten Wakatobi","Kota Bau-Bau","Kota Kendari"],
-      "Sulawesi Tengah": ["Kabupaten Banggai","Kabupaten Banggai Kepulauan","Kabupaten Banggai Laut","Kabupaten Buol","Kabupaten Donggala","Kabupaten Morowali","Kabupaten Morowali Utara","Kabupaten Parigi Moutong","Kabupaten Poso","Kabupaten Sigi","Kabupaten Tojo Una-Una","Kabupaten Toli-Toli","Kota Palu"],
-      "Sulawesi Utara": ["Kabupaten Bolaang Mongondow","Kabupaten Bolaang Mongondow Selatan","Kabupaten Bolaang Mongondow Timur","Kabupaten Bolaang Mongondow Utara","Kabupaten Kepulauan Sangihe","Kabupaten Kepulauan Siau Tagulandang Biaro","Kabupaten Kepulauan Talaud","Kabupaten Minahasa","Kabupaten Minahasa Selatan","Kabupaten Minahasa Tenggara","Kabupaten Minahasa Utara","Kota Bitung","Kota Kotamobagu","Kota Manado","Kota Tomohon"],
-      "Sulawesi Barat": ["Kabupaten Majene","Kabupaten Mamasa","Kabupaten Mamuju","Kabupaten Mamuju Tengah","Kabupaten Mamuju Utara","Kabupaten Polewali Mandar","Kota Mamuju"],
-      "Maluku": ["Kabupaten Buru","Kabupaten Buru Selatan","Kabupaten Kepulauan Aru","Kabupaten Maluku Barat Daya","Kabupaten Maluku Tengah","Kabupaten Maluku Tenggara","Kabupaten Maluku Tenggara Barat","Kabupaten Seram Bagian Barat","Kabupaten Seram Bagian Timur","Kota Ambon","Kota Tual"],
-      "Maluku Utara": ["Kabupaten Halmahera Barat","Kabupaten Halmahera Tengah","Kabupaten Halmahera Utara","Kabupaten Halmahera Selatan","Kabupaten Kepulauan Sula","Kabupaten Halmahera Timur","Kabupaten Pulau Morotai","Kabupaten Pulau Taliabu","Kota Ternate","Kota Tidore Kepulauan"],
-      "Papua": ["Kabupaten Asmat","Kabupaten Biak Numfor","Kabupaten Boven Digoel","Kabupaten Deiyai","Kabupaten Dogiyai","Kabupaten Intan Jaya","Kabupaten Jayapura","Kabupaten Jayawijaya","Kabupaten Keerom","Kabupaten Kepulauan Yapen","Kabupaten Lanny Jaya","Kabupaten Mamberamo Raya","Kabupaten Mamberamo Tengah","Kabupaten Mappi","Kabupaten Merauke","Kabupaten Mimika","Kabupaten Nabire","Kabupaten Nduga","Kabupaten Paniai","Kabupaten Pegunungan Bintang","Kabupaten Puncak","Kabupaten Puncak Jaya","Kabupaten Sarmi","Kabupaten Supiori","Kabupaten Tolikara","Kabupaten Waropen","Kabupaten Yahukimo","Kabupaten Yalimo","Kota Jayapura"],
-      "Papua Barat": ["Kabupaten Fakfak","Kabupaten Kaimana","Kabupaten Manokwari","Kabupaten Manokwari Selatan","Kabupaten Maybrat","Kabupaten Pegunungan Arfak","Kabupaten Raja Ampat","Kabupaten Sorong","Kabupaten Sorong Selatan","Kabupaten Tambrauw","Kabupaten Teluk Bintuni","Kabupaten Teluk Wondama"]
-    };
-/** Gejala list with IDs to map to inputs */
+  "Aceh": ["Kabupaten Aceh Besar","Kabupaten Pidie","Kota Banda Aceh","Kota Lhokseumawe"],
+  "Sumatera Utara": ["Kabupaten Deli Serdang","Kota Medan","Kabupaten Karo","Kabupaten Asahan"],
+  "DKI Jakarta": ["Kep. Seribu","Jakarta Selatan","Jakarta Timur","Jakarta Pusat","Jakarta Barat","Jakarta Utara"],
+  "Jawa Barat": ["Kabupaten Bandung","Kabupaten Bogor","Kota Bandung","Kota Bogor"],
+  "Jawa Tengah": ["Kabupaten Banyumas","Kabupaten Semarang","Kota Semarang","Kota Surakarta"],
+  "DI Yogyakarta": ["Kabupaten Sleman","Kabupaten Bantul","Kota Yogyakarta"],
+  "Jawa Timur": ["Kabupaten Banyuwangi","Kabupaten Malang","Kota Surabaya","Kota Malang"],
+  "Bali": ["Kabupaten Badung","Kabupaten Gianyar","Kota Denpasar"],
+  "Sulawesi Selatan": ["Kabupaten Gowa","Kabupaten Maros","Kota Makassar"],
+  "Nusa Tenggara Timur": ["Kabupaten Timor Tengah Utara","Kota Kupang","Kabupaten Sikka"]
+};
 const GEJALA = [
   {id:"demam", label:"Demam akut"},
   {id:"nyeriKepala", label:"Nyeri kepala"},
@@ -513,7 +456,6 @@ const GEJALA = [
   {id:"ruam", label:"Ruam kulit"},
   {id:"sesak", label:"Sesak napas"},
 ];
-/** Faktor risiko paparan (2 minggu) */
 const PAPARAN = [
   "Kontak dengan banjir",
   "Kontak sungai/danau (mencuci, mandi, pekerjaan)",
@@ -551,13 +493,12 @@ function initProvKab(){
   };
   prov.addEventListener('change', ()=> updateKab(kab, prov.value, false));
   fProv.addEventListener('change', ()=> updateKab(fKab, fProv.value, true));
-  // seed KAB filters initially
   updateKab(kab, prov.value, false);
   updateKab(fKab, fProv.value, true);
 }
 initProvKab();
 
-// Inject gejala checklist (2 kolom) with date inputs shown on check
+// Inject gejala checklist (2 kolom) with date show on check
 function initGejalaChecklist(){
   const grid = document.getElementById('gejalaGrid');
   GEJALA.forEach(g=>{
@@ -571,15 +512,8 @@ function initGejalaChecklist(){
     grid.appendChild(wrap);
     const cb = wrap.querySelector('input[type=checkbox]');
     const dt = wrap.querySelector('input[type=date]');
-    cb.addEventListener('change', ()=>{
-      dt.classList.toggle('hidden', !cb.checked);
-      updateOnset();
-      updateDefinisiBadge();
-    });
-    dt.addEventListener('change', ()=>{
-      updateOnset();
-      updateDefinisiBadge();
-    });
+    cb.addEventListener('change', ()=>{ dt.classList.toggle('hidden', !cb.checked); updateOnset(); updateDefinisiBadge(); });
+    dt.addEventListener('change', ()=>{ updateOnset(); updateDefinisiBadge(); });
   });
 }
 initGejalaChecklist();
@@ -596,14 +530,13 @@ function initPaparanChecklist(){
       <label for="${id}" style="margin:0; font-weight:500">${p}</label>
     `;
     grid.appendChild(wrap);
-    const cb = wrap.querySelector('input[type=checkbox]');
-    cb.addEventListener('change', updateDefinisiBadge);
+    wrap.querySelector('input[type=checkbox]').addEventListener('change', updateDefinisiBadge);
   });
 }
 initPaparanChecklist();
 
+// Onset
 function getOnsetDate(){
-  // earliest date across checked symptoms
   let earliest = null;
   GEJALA.forEach(g=>{
     const cb = document.getElementById('g_'+g.id);
@@ -617,29 +550,14 @@ function getOnsetDate(){
 }
 function updateOnset(){
   const onset = getOnsetDate();
-  const tag = document.getElementById('onsetTag');
-  tag.textContent = onset ? onset.toISOString().slice(0,10) : "—";
+  document.getElementById('onsetTag').textContent = onset ? onset.toISOString().slice(0,10) : "—";
 }
 
-// Utility: normalize string for duplicate key
-function norm(s){ return (s||"").toString().trim().toLowerCase().replace(/\s+/g,' '); }
-function getRadio(name){
-  const el = document.querySelector('input[name="'+name+'"]:checked');
-  return el ? el.value : '';
-}
-
-// Case definition computation
+// Case definition
+function getRadio(name){ return (document.querySelector('input[name="'+name+'"]:checked')?.value)||''; }
 function computeDefinisi(){
-  // collect symptoms map
-  const S = {};
-  GEJALA.forEach(g=>{
-    S[g.id] = document.getElementById('g_'+g.id).checked;
-  });
-
-  // exposure in last 2 weeks: any checked
-  const anyExposure = PAPARAN.some((p,idx)=> document.getElementById('p_'+idx).checked );
-
-  // labs
+  const S = {}; GEJALA.forEach(g=>{ S[g.id] = document.getElementById('g_'+g.id).checked; });
+  const anyExposure = PAPARAN.some((_,idx)=> document.getElementById('p_'+idx).checked );
   const leuk = parseFloat(document.getElementById('leukosit').value);
   const trom = parseFloat(document.getElementById('trombosit').value);
   const bili = parseFloat(document.getElementById('bilirubin').value);
@@ -647,50 +565,28 @@ function computeDefinisi(){
   const cpk  = parseFloat(document.getElementById('cpk').value);
   const proteinuria = document.getElementById('proteinuria').checked;
   const hematuria   = document.getElementById('hematuria').checked;
-  const rdt = getRadio('rdt'); // pos/neg/nd/""
-  const mat = getRadio('mat');
-  const pcr = getRadio('pcr');
-
-  // SUSPEK:
-  // Demam ± nyeri kepala + (mialgia OR malaise OR conj) + riwayat paparan
+  const rdt = getRadio('rdt'), mat = getRadio('mat'), pcr = getRadio('pcr');
   const hasFever = !!S.demam;
-  const headOK = true; // "dengan atau tanpa" sakit kepala, so not required
   const supportMinor = (S.mialgia || S.malaise || S.conj);
   const suspek = hasFever && supportMinor && anyExposure;
-
-  // PROBABLE:
-  // 1) Suspek + min 2 dari daftar klinis berat
   const severeList = [S.nyeriBetis, S.jaundice, S.anuria, S.perdarahan, S.sesak, S.aritmia, S.batuk, S.ruam];
   const severeCount = severeList.filter(Boolean).length;
   const crit1 = suspek && severeCount >= 2;
-
-  // 2) RDT positif
   const crit2 = (rdt === 'pos');
-
-  // 3) Suspek + >=3 dari kriteria lab:
-  // a) Trombosit < 100
   const labA = (!isNaN(trom) && trom < 100);
-  // b) Leukosit di luar 3.5–10.5
   const labB = (!isNaN(leuk) && (leuk < 3.5 || leuk > 10.5));
-  // c) Bilirubin > 2 mg/dL ATAU Amilase tinggi ATAU CPK tinggi
   const labC = ((!isNaN(bili) && bili > 2) || (!isNaN(amil) && amil > 110) || (!isNaN(cpk) && cpk > 200));
-  // d) proteinuria/hematuria
   const labD = (proteinuria || hematuria);
   const labCount = [labA, labB, labC, labD].filter(Boolean).length;
   const crit3 = suspek && labCount >= 3;
-
   const probable = (crit1 || crit2 || crit3);
-
-  // CONFIRMED:
-  const confirmed = ( (suspek || probable) && (mat === 'pos' || pcr === 'pos') );
-
+  const confirmed = ((suspek || probable) && (mat === 'pos' || pcr === 'pos'));
   let def = "Tidak memenuhi";
   if(confirmed) def = "Confirm";
   else if(probable) def = "Probable";
   else if(suspek) def = "Suspek";
   return def;
 }
-
 function updateDefinisiBadge(){
   const def = computeDefinisi();
   const badge = document.getElementById('defBadge');
@@ -703,13 +599,10 @@ function updateDefinisiBadge(){
   else cls = 'bad';
   badge.classList.add(cls);
 }
-
-// highlight abnormal labs
 ['leukosit','trombosit','bilirubin','sgot','sgpt','kreatinin','amilase','cpk'].forEach(id=>{
   const el = document.getElementById(id);
   el && el.addEventListener('input', ()=>{
-    const v = parseFloat(el.value);
-    let abn=false;
+    const v = parseFloat(el.value); let abn=false;
     switch(id){
       case 'leukosit': abn = !isNaN(v) && (v<3.5 || v>10.5); break;
       case 'trombosit': abn = !isNaN(v) && (v<150 || v>450); break;
@@ -726,10 +619,10 @@ function updateDefinisiBadge(){
 });
 
 // Form save/reset
+function norm(s){ return (s||"").toString().trim().toLowerCase().replace(/\\s+/g,' '); }
 function getFormData(){
   const onsetDate = getOnsetDate();
-  const gejala = {};
-  const gejalaTgl = {};
+  const gejala = {}; const gejalaTgl = {};
   GEJALA.forEach(g=>{
     gejala[g.label] = document.getElementById('g_'+g.id).checked;
     const d = document.getElementById('d_'+g.id).value || "";
@@ -772,7 +665,6 @@ function getFormData(){
   };
   return data;
 }
-
 function resetForm(){
   document.querySelectorAll('input, select, textarea').forEach(el=>{
     if(el.type === 'checkbox' || el.type === 'radio') el.checked = false;
@@ -782,17 +674,10 @@ function resetForm(){
   updateOnset();
   updateDefinisiBadge();
 }
-
 document.getElementById('reset').addEventListener('click', (e)=>{ e.preventDefault(); resetForm(); });
 
-function loadCases(){
-  try{
-    return JSON.parse(localStorage.getItem('lepto_cases') || '[]');
-  }catch(e){ return []; }
-}
-function saveCases(arr){
-  localStorage.setItem('lepto_cases', JSON.stringify(arr));
-}
+function loadCases(){ try{ return JSON.parse(localStorage.getItem('lepto_cases') || '[]'); }catch(e){ return []; } }
+function saveCases(arr){ localStorage.setItem('lepto_cases', JSON.stringify(arr)); }
 
 function renderCounts(){
   const data = loadCases();
@@ -803,27 +688,16 @@ function renderCounts(){
     else if(d.definisi === 'Confirm') counts.Confirm++;
     else counts.Other++;
   });
-  const box = document.getElementById('counts');
-  box.innerHTML = '';
+  const box = document.getElementById('counts'); box.innerHTML='';
   Object.entries(counts).forEach(([k,v])=>{
     const span = document.createElement('span');
-    const cls = k==='Confirm' ? 'ok' : (k==='Probable' ? 'warn' : (k==='Suspek' ? '' : ''));
-    span.className = 'tag '+cls;
-    span.textContent = k+': '+v;
-    box.appendChild(span);
+    const cls = k==='Confirm' ? 'ok' : (k==='Probable' ? 'warn' : (k==='Suspek' ? '' : 'bad'));
+    span.className = 'tag '+cls; span.textContent = k+': '+v; box.appendChild(span);
   });
 }
-
-function defClass(def){
-  if(def === 'Confirm') return 'ok';
-  if(def === 'Probable') return 'warn';
-  if(def === 'Suspek') return '';
-  return 'bad';
-}
+function defClass(def){ if(def==='Confirm') return 'ok'; if(def==='Probable') return 'warn'; if(def==='Suspek') return ''; return 'bad'; }
 function renderTable(){
-
-  const tbody = document.querySelector('#casesTable tbody');
-  tbody.innerHTML = '';
+  const tbody = document.querySelector('#casesTable tbody'); tbody.innerHTML='';
   const data = loadCases();
   data.forEach((d, idx)=>{
     const tr = document.createElement('tr');
@@ -833,66 +707,43 @@ function renderTable(){
       <td>${d.prov}</td>
       <td>${d.kab}</td>
       <td>${d.onset || '-'}</td>
-      <td><span class=\"tag ${defClass(d.definisi)}\">${d.definisi}</span></td>
+      <td><span class="tag ${defClass(d.definisi)}">${d.definisi}</span></td>
       <td>${d.statusAkhir || '-'}</td>
       <td><button class="btn small" data-del="${idx}">Hapus</button></td>
     `;
     tbody.appendChild(tr);
   });
-  // delete actions
   tbody.querySelectorAll('button[data-del]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const i = parseInt(btn.getAttribute('data-del'), 10);
-      const arr = loadCases();
-      arr.splice(i,1);
-      saveCases(arr);
-      renderTable(); renderCounts(); updateCharts();
+      const arr = loadCases(); arr.splice(i,1); saveCases(arr);
+      renderTable(); renderCounts(); updateCharts(); recalcCasesFromLocalAndRefresh();
     });
   });
 }
-
 document.getElementById('simpan').addEventListener('click', (e)=>{
   e.preventDefault();
   const data = getFormData();
-  // Basic validation
   if(!data.nama){ alert('Nama wajib diisi.'); return; }
   if(!data.prov || !data.kab){ alert('Provinsi dan Kabupaten/Kota wajib dipilih.'); return; }
-  const arr = loadCases();
-  arr.push(data);
-  saveCases(arr);
-  renderTable(); renderCounts(); updateCharts();
+  const arr = loadCases(); arr.push(data); saveCases(arr);
+  renderTable(); renderCounts(); updateCharts(); recalcCasesFromLocalAndRefresh();
   alert('Kasus disimpan.');
 });
-
-// Duplicate detection/removal
-function duplicateKey(d){
-  return [norm(d.nama), norm(d.umur), norm(d.alamat), d.onset || ''].join('|');
-}
+function duplicateKey(d){ return [norm(d.nama), norm(d.umur), norm(d.alamat), d.onset || ''].join('|'); }
 document.getElementById('cekDup').addEventListener('click', ()=>{
-  const arr = loadCases();
-  const seen = {};
-  const dups = new Set();
-  arr.forEach((d, i)=>{
-    const k = duplicateKey(d);
-    if(seen[k] !== undefined){ dups.add(i); dups.add(seen[k]); } else { seen[k] = i; }
-  });
-  // highlight
+  const arr = loadCases(); const seen = {}; const dups = new Set();
+  arr.forEach((d,i)=>{ const k = duplicateKey(d); if(seen[k]!==undefined){dups.add(i); dups.add(seen[k]);} else {seen[k]=i;} });
   const rows = document.querySelectorAll('#casesTable tbody tr');
-  rows.forEach((tr, i)=> tr.classList.toggle('dup', dups.has(i)));
-  alert(dups.size ? 'Duplikat ditemukan & ditandai warna krem.' : 'Tidak ada duplikat.');
+  rows.forEach((tr,i)=> tr.classList.toggle('dup', dups.has(i)));
+  alert(duplikatSizeMessage(dups.size));
+  function duplikatSizeMessage(n){ return n?('Duplikat ditemukan & ditandai warna krem.'):('Tidak ada duplikat.'); }
 });
-
 document.getElementById('hapusDup').addEventListener('click', ()=>{
-  const arr = loadCases();
-  const seen = {};
-  const result = [];
-  arr.forEach(d=>{
-    const k = duplicateKey(d);
-    if(!(k in seen)){ seen[k]=true; result.push(d); }
-  });
-  const removed = arr.length - result.length;
-  saveCases(result);
-  renderTable(); renderCounts(); updateCharts();
+  const arr = loadCases(); const seen = {}; const result = [];
+  arr.forEach(d=>{ const k = duplicateKey(d); if(!(k in seen)){ seen[k]=true; result.push(d); } });
+  const removed = arr.length - result.length; saveCases(result);
+  renderTable(); renderCounts(); updateCharts(); recalcCasesFromLocalAndRefresh();
   alert(removed>0 ? ('Menghapus '+removed+' duplikat.') : 'Tidak ada duplikat untuk dihapus.');
 });
 
@@ -902,232 +753,212 @@ function ensureCharts(){
   const ctx1 = document.getElementById('trendChart').getContext('2d');
   const ctx2 = document.getElementById('kabChart').getContext('2d');
   if(!trendChart){
-    trendChart = new Chart(ctx1, {
-      type:'line',
-      data:{labels:[], datasets:[{label:'Kasus / bulan', data:[]}]},
-      options:{
-        responsive:true,
-        plugins:{legend:{display:false}},
-        scales:{y:{beginAtZero:true}}
-      }
-    });
+    trendChart = new Chart(ctx1, { type:'line', data:{labels:[], datasets:[{label:'Kasus / bulan', data:[]}]},
+      options:{ responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}} } });
   }
   if(!kabChart){
-    kabChart = new Chart(ctx2, {
-      type:'bar',
-      data:{labels:[], datasets:[{label:'Kasus / kabupaten-kota', data:[]}]},
-      options:{
-        responsive:true,
-        plugins:{legend:{display:false}},
-        scales:{y:{beginAtZero:true}}
-      }
-    });
+    kabChart = new Chart(ctx2, { type:'bar', data:{labels:[], datasets:[{label:'Kasus / kabupaten-kota', data:[]}]},
+      options:{ responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}} } });
   }
 }
 ensureCharts();
-
-function monthKey(d){ return d.slice(0,7); } // YYYY-MM
+function monthKey(d){ return d.slice(0,7); }
 function withinRange(d, start, end){
   const m = monthKey(d);
   if(start && m < start) return false;
   if(end && m > end) return false;
   return true;
 }
-
 function updateCharts(){
   const arr = loadCases();
-  // filters
-  const fp = fProv.value || "";
-  const fk = fKab.value || "";
-  const ms = fStart.value || "";
-  const me = fEnd.value || "";
+  const fp = fProv.value || ""; const fk = fKab.value || ""; const ms = fStart.value || ""; const me = fEnd.value || "";
+  const filtered = arr.filter(d=>{ if(fp && d.prov !== fp) return false; if(fk && d.kab !== fk) return false; if(d.onset){ if(!withinRange(d.onset, ms, me)) return false; } return true; });
+  const perMonth = {}; filtered.forEach(d=>{ if(!d.onset) return; const m = monthKey(d.onset); perMonth[m]=(perMonth[m]||0)+1; });
+  const mKeys = Object.keys(perMonth).sort(); trendChart.data.labels=mKeys; trendChart.data.datasets[0].data = mKeys.map(k=>perMonth[k]||0); trendChart.update();
+  const perKab = {}; filtered.forEach(d=>{ const kk=d.kab || '(Tidak diisi)'; perKab[kk]=(perKab[kk]||0)+1; });
+  const kLabels = Object.keys(perKab).sort(); kabChart.data.labels=kLabels; kabChart.data.datasets[0].data = kLabels.map(k=>perKab[k]||0); kabChart.update();
+}
+document.getElementById('applyFilter').addEventListener('click', updateCharts);
 
-  const filtered = arr.filter(d=>{
-    if(fp && d.prov !== fp) return false;
-    if(fk && d.kab !== fk) return false;
-    if(d.onset){
-      if(!withinRange(d.onset, ms, me)) return false;
-    }else{
-      // if onset unknown, exclude from time trend
+/* =====================
+   PETA CHOROPLETH
+   ===================== */
+// Pewarnaan sesuai ketentuan
+function getColor(val){
+  const v = Number(val)||0;
+  if(v === 0) return '#ffffff';
+  if(v > 0 && v <= 50) return '#ffc4c4';
+  if(v > 50 && v <= 200) return '#ff7a7a';
+  return '#cc0000';
+}
+let map, geojsonLayer; let _labels=[];
+function ensureMap(){
+  if(map) return map;
+  map = L.map('map', { zoomControl: true });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'&copy; OpenStreetMap' }).addTo(map);
+  L.control.scale({ imperial:false }).addTo(map);
+  map.setView([-2.5,118], 5);
+  return map;
+}
+// Default demo counts; can be overridden from saved cases
+let casesByProvince = {
+  "Aceh": 12, "Sumatera Utara": 28, "Sumatera Barat": 8, "Riau": 15, "Jambi": 5, "Sumatera Selatan": 31,
+  "Bengkulu": 2, "Lampung": 44, "Kepulauan Bangka Belitung": 1, "Kepulauan Riau": 3, "DKI Jakarta": 320,
+  "Jawa Barat": 188, "Jawa Tengah": 96, "DI Yogyakarta": 45, "Jawa Timur": 210, "Banten": 74, "Bali": 12,
+  "Nusa Tenggara Barat": 9, "Nusa Tenggara Timur": 20, "Kalimantan Barat": 6, "Kalimantan Tengah": 4,
+  "Kalimantan Selatan": 11, "Kalimantan Timur": 7, "Kalimantan Utara": 1, "Sulawesi Utara": 5, "Sulawesi Tengah": 6,
+  "Sulawesi Selatan": 130, "Sulawesi Tenggara": 4, "Gorontalo": 1, "Sulawesi Barat": 2, "Maluku": 1,
+  "Maluku Utara": 1, "Papua Barat": 1, "Papua": 2, "Papua Selatan": 0, "Papua Tengah": 0, "Papua Pegunungan": 0
+};
+function totalNational(){ return Object.values(casesByProvince).reduce((a,b)=>a+(+b||0), 0); }
+function getProvName(props){
+  return props?.provinsi || props?.Provinsi || props?.PROVINSI || props?.NAME_1 || props?.Name ||
+         props?.WADMPR || props?.wadmpr || props?.WADMPRV || props?.nama || props?.name || '';
+}
+function styleFeature(feat){
+  const prov = getProvName(feat.properties||{});
+  const val = +casesByProvince[prov] || 0;
+  return { weight:1, color:'#9ca3af', fillColor:getColor(val), fillOpacity:0.8 };
+}
+function highlightFeature(e){ e.target.setStyle({ weight:2, fillOpacity:0.9, color:'#6b7280' }); e.target.bringToFront?.(); }
+function resetHighlight(e){ geojsonLayer && geojsonLayer.resetStyle(e.target); }
+function onEachFeature(feature, layer){
+  const prov = getProvName(feature.properties||{});
+  const val = +casesByProvince[prov] || 0;
+  if(prov && !(prov in casesByProvince)){
+    console.warn('⚠️ Nama provinsi pada GeoJSON tidak cocok dengan key casesByProvince:', prov);
+  }
+  const pct = totalNational() ? ((val/totalNational())*100).toFixed(1) : '0.0';
+  layer.bindTooltip(`${prov||'(tanpa nama)'}: ${val.toLocaleString('id-ID')} kasus`, {sticky:true});
+  layer.on({ mouseover:highlightFeature, mouseout:resetHighlight, click:()=>{
+    layer.bindPopup(`<b>${prov||'(tanpa nama)'}</b><br>Kasus: ${val.toLocaleString('id-ID')}<br>Kontribusi nasional: ${pct}%`).openPopup();
+  }});
+}
+function addCenterLabels(){
+  if(!map || !geojsonLayer) return;
+  _labels.forEach(l=> map.removeLayer(l)); _labels = [];
+  geojsonLayer.eachLayer(function(layer){
+    const prov = getProvName(layer.feature?.properties||{});
+    const val = +casesByProvince[prov] || 0;
+    if(val > 0){
+      const c = layer.getBounds().getCenter();
+      const t = L.tooltip({ permanent:true, direction:'center', className:'prov-label' })
+                  .setContent(String(val)).setLatLng(c);
+      _labels.push(t); t.addTo(map);
     }
-    return true;
   });
-
-  // aggregate by month
-  const perMonth = {};
-  filtered.forEach(d=>{
-    if(!d.onset) return;
-    const m = monthKey(d.onset);
-    perMonth[m] = (perMonth[m]||0)+1;
-  });
-  const mKeys = Object.keys(perMonth).sort();
-  trendChart.data.labels = mKeys;
-  trendChart.data.datasets[0].data = mKeys.map(k=>perMonth[k]||0);
-  trendChart.update();
-
-  // aggregate by kabupaten/kota
-  const perKab = {};
-  filtered.forEach(d=>{
-    const kk = d.kab || '(Tidak diisi)';
-    perKab[kk] = (perKab[kk]||0)+1;
-  });
-  const kLabels = Object.keys(perKab).sort();
-  kabChart.data.labels = kLabels;
-  kabChart.data.datasets[0].data = kLabels.map(k=>perKab[k]||0);
-  kabChart.update();
 }
-document.getElementById('applyFilter').addEventListener('click', ()=>{
-  updateCharts();
-});
+const legend = L.control({ position:'topright' });
+legend.onAdd = function(){
+  const div = L.DomUtil.create('div','legend');
+  div.innerHTML = '<div class="legend-title">Kategori Kasus</div>'+
+                  '<div class="legend-row"><span class="swatch" style="background:#ffffff"></span>0</div>'+
+                  '<div class="legend-row"><span class="swatch" style="background:#ffc4c4"></span>1–50</div>'+
+                  '<div class="legend-row"><span class="swatch" style="background:#ff7a7a"></span>50–200</div>'+
+                  '<div class="legend-row"><span class="swatch" style="background:#cc0000"></span>&gt;200</div>';
+  return div;
+};
+function refreshChoropleth(){ geojsonLayer && geojsonLayer.setStyle(styleFeature); addCenterLabels(); }
 
-// Export to Excel (XLSX)
-function flattenCase(d){
-  const row = {
-    'Nama': d.nama,
-    'Jenis Kelamin': d.jk,
-    'Umur': d.umur,
-    'Pekerjaan': d.kerja,
-    'Provinsi': d.prov,
-    'Kab/Kota': d.kab,
-    'Alamat': d.alamat,
-    'Onset': d.onset,
-    'Tanggal Paparan': d.tglPaparan,
-    'Definisi': d.definisi,
-    'Status Akhir': d.statusAkhir,
-    'Tanggal Status': d.tglStatus,
-    'Obat': d.obat,
-    'Saved At': d.savedAt
-  };
-  // Gejala (boolean + tanggal)
-  GEJALA.forEach(g=>{
-    const label = g.label;
-    row['Gejala: '+label] = d.gejala[label] ? 'Ya' : '';
-    row['Tgl '+label] = d.gejalaTgl[label] || '';
-  });
-  // Paparan
-  row['Paparan (2 minggu)'] = (d.paparan||[]).filter(x=>x.checked).map(x=>x.label).join('; ');
-  // Lab
-  const L = d.lab||{};
-  row['Leukosit (x10^3/µL)'] = L.leukosit||'';
-  row['Trombosit (x10^3/µL)'] = L.trombosit||'';
-  row['Bilirubin (mg/dL)'] = L.bilirubin||'';
-  row['SGOT (U/L)'] = L.sgot||'';
-  row['SGPT (U/L)'] = L.sgpt||'';
-  row['Kreatinin (mg/dL)'] = L.kreatinin||'';
-  row['Amilase (U/L)'] = L.amilase||'';
-  row['CPK (U/L)'] = L.cpk||'';
-  row['Proteinuria'] = L.proteinuria ? 'Ya' : '';
-  row['Hematuria'] = L.hematuria ? 'Ya' : '';
-  const map3 = v => v==='pos'?'Positif':(v==='neg'?'Negatif':(v==='nd'?'Tidak diperiksa':''));
-  row['RDT'] = map3(L.rdt);
-  row['MAT'] = map3(L.mat);
-  row['PCR'] = map3(L.pcr);
-  row['Serovar'] = L.serovar||'';
-  return row;
+// Load GeoJSON helpers
+function toRawGitHub(url){
+  try{
+    const u = new URL(url);
+    if(u.hostname === 'github.com' && u.pathname.includes('/blob/')){
+      const parts = u.pathname.split('/').filter(Boolean);
+      const [user, repo, , branch, ...rest] = parts;
+      return `https://raw.githubusercontent.com/${user}/${repo}/${branch}/${rest.join('/')}`;
+    }
+    return url;
+  }catch(_){ return url; }
 }
-function exportToExcel(){
+async function loadFromUrl(url){
+  const raw = toRawGitHub(url);
+  const res = await fetch(raw, {mode:'cors'});
+  if(!res.ok) throw new Error('Gagal fetch GeoJSON: '+res.status);
+  return await res.json();
+}
+function renderChoropleth(geojson){
+  ensureMap();
+  if(geojsonLayer) map.removeLayer(geojsonLayer);
+  geojsonLayer = L.geoJSON(geojson, { style:styleFeature, onEachFeature:onEachFeature }).addTo(map);
+  try{ map.fitBounds(geojsonLayer.getBounds(), { padding:[10,10] }); }catch(_){}
+  if(!legend._map) legend.addTo(map);
+  addCenterLabels();
+}
+
+// Export PNG
+function exportPNG(){
+  if(!map){ alert('Peta belum dirender.'); return; }
+  leafletImage(map, function(err, canvas){
+    if(err){ alert('Gagal membuat gambar: '+err); return; }
+    const a = document.createElement('a');
+    a.download = 'choropleth.png';
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+  });
+}
+
+// Recalculate counts from local data
+function recalcCasesByProvinceFromLocal(){
   const arr = loadCases();
-  if(arr.length===0){ alert('Tidak ada data untuk diekspor.'); return; }
-  const rows = arr.map(flattenCase);
-  const ws = XLSX.utils.json_to_sheet(rows);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Kasus');
-  XLSX.writeFile(wb, 'leptospirosis_cases.xlsx');
+  const counts = {};
+  arr.forEach(d=>{
+    const p = d.prov || '(Tidak diisi)';
+    counts[p] = (counts[p]||0)+1;
+  });
+  return counts;
 }
-const exportBtn = document.getElementById('exportExcel');
-if(exportBtn){ exportBtn.addEventListener('click', exportToExcel); }
+function recalcCasesFromLocalAndRefresh(){
+  const counts = recalcCasesByProvinceFromLocal();
+  if(Object.keys(counts).length){ casesByProvince = counts; refreshChoropleth(); }
+}
 
-// Auto-update definisi setiap perubahan isian
+// Bind UI
+const ghUrl = document.getElementById('ghUrl');
+const loadGithubBtn = document.getElementById('loadGithub');
+const input = document.getElementById('gj');
+const exportPngBtn = document.getElementById('exportPng');
+const recalcBtn = document.getElementById('recalcMap');
+
+input?.addEventListener('change', async (e)=>{
+  const f = e.target.files && e.target.files[0]; if(!f) return;
+  try{ const text = await f.text(); const json = JSON.parse(text); renderChoropleth(json); }
+  catch(err){ alert('File GeoJSON tidak valid.'); }
+});
+loadGithubBtn?.addEventListener('click', async ()=>{
+  const url = (ghUrl.value||'').trim();
+  if(!url){ alert('Masukkan URL RAW GitHub untuk GeoJSON.'); return; }
+  try{ const json = await loadFromUrl(url); renderChoropleth(json); }
+  catch(err){ alert('Gagal memuat dari GitHub: '+err.message); }
+});
+exportPngBtn?.addEventListener('click', exportPNG);
+recalcBtn?.addEventListener('click', ()=>{ recalcCasesFromLocalAndRefresh(); });
+
+// Auto-load default GeoJSON
+const DEFAULT_GH = 'https://github.com/agustddiction/Dashboard-Leptospirosis/blob/main/provinsi.json';
+(async function initMap(){
+  ensureMap();
+  if(ghUrl) ghUrl.value = DEFAULT_GH;
+  try{
+    const data = await loadFromUrl(DEFAULT_GH);
+    renderChoropleth(data);
+    recalcCasesFromLocalAndRefresh();
+  }catch(err){ console.warn('Auto-load GeoJSON gagal:', err); }
+})();
+
+// Auto-update definisi badge when inputs change
 const _root = document.querySelector('main');
 function _autoUpd(){ updateOnset(); updateDefinisiBadge(); }
 _root.addEventListener('input', _autoUpd, true);
 _root.addEventListener('change', _autoUpd, true);
 
-// live badge initial
+// Initialize dashboard views
 updateOnset();
 updateDefinisiBadge();
 renderTable();
 renderCounts();
 updateCharts();
-
-// === 1) DATA KASUS — EDIT DI SINI ===
-// === 4) MUAT GEOJSON ===
-// Konversi URL github.com/.../blob/... -> raw.githubusercontent.com/... untuk fetch
-function toRawGitHub(url){
-try{
-const u = new URL(url);
-if(u.hostname === 'github.com' && u.pathname.includes('/blob/')){
-const parts = u.pathname.split('/').filter(Boolean); // [user, repo, 'blob', branch, ...path]
-const [user, repo, , branch, ...rest] = parts;
-return `https://raw.githubusercontent.com/${user}/${repo}/${branch}/${rest.join('/')}`;
-}
-return url;
-}catch(_){ return url; }
-}
-async function loadFromUrl(url){
-const raw = toRawGitHub(url);
-const res = await fetch(raw, {mode:'cors'});
-if(!res.ok) throw new Error('Gagal fetch GeoJSON: '+res.status);
-return await res.json();
-}
-
-
-function renderChoropleth(geojson){
-ensureMap();
-if(geojsonLayer) map.removeLayer(geojsonLayer);
-geojsonLayer = L.geoJSON(geojson, { style:styleFeature, onEachFeature:onEachFeature }).addTo(map);
-try{ map.fitBounds(geojsonLayer.getBounds(), { padding:[10,10] }); }catch(_){ /* ignore */ }
-if(!legend._map) legend.addTo(map);
-addCenterLabels();
-}
-
-
-// === 5) EKSPOR PNG ===
-function exportPNG(){
-if(!map){ alert('Peta belum dirender.'); return; }
-leafletImage(map, function(err, canvas){
-if(err){ alert('Gagal membuat gambar: '+err); return; }
-const a = document.createElement('a');
-a.download = 'choropleth.png';
-a.href = canvas.toDataURL('image/png');
-a.click();
-});
-}
-
-
-// === 6) IKAT UI ===
-const ghUrl = document.getElementById('ghUrl');
-const loadGithubBtn = document.getElementById('loadGithub');
-const input = document.getElementById('gj');
-const exportBtn = document.getElementById('exportPng');
-
-
-input?.addEventListener('change', async (e)=>{
-const f = e.target.files && e.target.files[0]; if(!f) return;
-try{ const text = await f.text(); const json = JSON.parse(text); renderChoropleth(json); }
-catch(err){ alert('File GeoJSON tidak valid.'); }
-});
-loadGithubBtn?.addEventListener('click', async ()=>{
-const url = (ghUrl.value||'').trim();
-if(!url){ alert('Masukkan URL RAW GitHub untuk GeoJSON.'); return; }
-try{ const json = await loadFromUrl(url); renderChoropleth(json); }
-catch(err){ alert('Gagal memuat dari GitHub: '+err.message); }
-});
-exportBtn?.addEventListener('click', exportPNG);
-
-
-// === 7) AUTO-LOAD dari URL default pengguna ===
-// File JSON peta dari pengguna:
-const DEFAULT_GH = 'https://github.com/agustddiction/Dashboard-Leptospirosis/blob/main/provinsi.json';
-(async function init(){
-ensureMap();
-if(ghUrl) ghUrl.value = DEFAULT_GH;
-try{
-const data = await loadFromUrl(DEFAULT_GH);
-renderChoropleth(data);
-}catch(err){ console.warn('Auto-load GeoJSON gagal:', err); }
-})();
-  
 </script>
 </body>
 </html>
