@@ -9,15 +9,26 @@ const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbxFHgRel9-LTQTc0YIjy
 // =====================
 // TOKEN GATE
 // =====================
+let unlocked = false;
 function showLock(){ const lock=document.getElementById('lock'); if(lock){ lock.classList.remove('hidden'); document.body.classList.add('locked'); setTimeout(()=>document.getElementById('tokenInput')?.focus(),50);} }
+function afterUnlock(){
+  unlocked = true;
+  hideLock();
+  // Invalidate charts & map after the overlay is gone
+  setTimeout(()=>{
+    initMap(); // init map only after unlocked
+    try{ trendChart?.resize(); kabChart?.resize(); }catch(_){}
+    setTimeout(()=>{ if(window._leaf_map) { window._leaf_map.invalidateSize(); try{ fitIndonesia(); }catch(_){}} }, 200);
+  }, 100);
+}
 function hideLock(){ const lock=document.getElementById('lock'); if(lock){ lock.remove(); document.body.classList.remove('locked'); } }
 function verifyToken(){
   const val=(document.getElementById('tokenInput')?.value||'').trim();
   const err=document.getElementById('lockErr');
-  if(val===ACCESS_TOKEN){ localStorage.setItem('lepto_token_ok','1'); hideLock(); } else { if(err){err.textContent='Token salah. Coba lagi.'; err.style.display='block';} }
+  if(val===ACCESS_TOKEN){ localStorage.setItem('lepto_token_ok','1'); afterUnlock(); } else { if(err){err.textContent='Token salah. Coba lagi.'; err.style.display='block';} }
 }
-function autoUnlockFromURL(){ try{ const t=new URLSearchParams(location.search).get('token'); if(t===ACCESS_TOKEN){ localStorage.setItem('lepto_token_ok','1'); hideLock(); } }catch(e){} }
-(function(){ const ok=localStorage.getItem('lepto_token_ok')==='1'; if(!ok) showLock();
+function autoUnlockFromURL(){ try{ const t=new URLSearchParams(location.search).get('token'); if(t===ACCESS_TOKEN){ localStorage.setItem('lepto_token_ok','1'); afterUnlock(); } }catch(e){} }
+(function(){ const ok=localStorage.getItem('lepto_token_ok')==='1'; if(!ok) showLock(); else afterUnlock();
   document.getElementById('unlockBtn')?.addEventListener('click', verifyToken);
   document.addEventListener('keydown', e=>{ const lock=document.getElementById('lock'); if(lock && !lock.classList.contains('hidden') && e.key==='Enter') verifyToken(); });
   autoUnlockFromURL();
@@ -55,30 +66,28 @@ const PAPARAN=[
   "Hobi/olahraga/wisata (berenang, memancing, arung jeram, dll.)",
 ];
 
-// DOM elemen filter/controls
 const prov=document.getElementById('prov'); const kab=document.getElementById('kab');
 const fProv=document.getElementById('fProv'); const fKab=document.getElementById('fKab');
 const fStart=document.getElementById('fStart'); const fEnd=document.getElementById('fEnd');
-const trendTypeSel=document.getElementById('trendType');
-const trendGranSel=document.getElementById('trendGran');
-const yearRange=document.getElementById('yearRange');
-const yStart=document.getElementById('yStart');
-const yEnd=document.getElementById('yEnd');
-const kabTypeSel=document.getElementById('kabType');
+const fTimeMode=document.getElementById('fTimeMode'); const fYearStart=document.getElementById('fYearStart'); const fYearEnd=document.getElementById('fYearEnd');
+const trendTitle=document.getElementById('trendTitle');
 
 function initProvKab(){
   const provs=Object.keys(PROV_KAB).sort();
   const addOpts=(sel,items,withAll=false)=>{ sel.innerHTML=""; if(withAll) sel.append(new Option("Semua","")); sel.append(new Option("Pilih...","")); items.forEach(x=>sel.append(new Option(x,x))); };
   addOpts(prov,provs,false); addOpts(fProv,provs,true);
-  const updateKab=(selKab,provName,withAll=false)=>{ selKab.innerHTML=""; if(withAll) selKab.append(new Option("Semua","")); if(!provName||!PROV_KAB[provName]){ selKab.append(new Option("Pilih provinsi dulu","")); return; } PROV_KAB[provName].forEach(x=>selKab.append(new Option(x,x))); };
+  const updateKab=(selKab,provName,withAll=false)=>{
+    selKab.innerHTML=""; if(withAll) selKab.append(new Option("Semua",""));
+    if(!provName||!PROV_KAB[provName]){ selKab.append(new Option("Pilih provinsi dulu","")); return; }
+    PROV_KAB[provName].forEach(x=>selKab.append(new Option(x,x)));
+  };
   prov.addEventListener('change', ()=>updateKab(kab,prov.value,false));
-  fProv.addEventListener('change', ()=>{ updateKab(fKab,fProv.value,true); updateCharts(); });
-  fKab.addEventListener('change', updateCharts);
+  fProv.addEventListener('change', ()=>updateKab(fKab,fProv.value,true));
   updateKab(kab,prov.value,false); updateKab(fKab,fProv.value,true);
 }
 
 // =====================
-// GEJALA checklist (tanggal muncul saat dicentang)
+// RIWAYAT GEJALA
 // =====================
 function initGejalaChecklist(){
   const grid=document.getElementById('gejalaGrid');
@@ -102,6 +111,9 @@ function initGejalaChecklist(){
 }
 initGejalaChecklist();
 
+// =====================
+// PAPARAN
+// =====================
 function initPaparanChecklist(){
   const grid=document.getElementById('paparanGrid'); grid.innerHTML='';
   PAPARAN.forEach((p,idx)=>{
@@ -115,7 +127,7 @@ function initPaparanChecklist(){
 initPaparanChecklist();
 
 // =====================
-// ONSET & DEFINISI
+// ONSET & DEFINISI KASUS
 // =====================
 function getOnsetDate(){
   let earliest=null;
@@ -130,6 +142,7 @@ function getOnsetDate(){
   return earliest;
 }
 function updateOnset(){ const onset=getOnsetDate(); document.getElementById('onsetTag').textContent = onset ? onset.toISOString().slice(0,10) : "—"; }
+
 function getRadio(name){ return (document.querySelector('input[name="'+name+'"]:checked')?.value)||''; }
 function computeDefinisi(){
   const S={}; GEJALA.forEach(g=>{ S[g.id]=document.getElementById('g_'+g.id)?.checked; });
@@ -165,12 +178,30 @@ function updateDefinisiBadge(){
   else if(def==='Suspek') badge.classList.add('neutral');
   else badge.classList.add('bad');
 }
+// Tandai abnormal
+['leukosit','trombosit','bilirubin','sgot','sgpt','kreatinin','amilase','cpk'].forEach(id=>{
+  const el=document.getElementById(id);
+  el && el.addEventListener('input', ()=>{
+    const v=parseFloat(el.value); let abn=false;
+    switch(id){
+      case 'leukosit': abn=!isNaN(v)&&(v<3.5||v>10.5); break;
+      case 'trombosit': abn=!isNaN(v)&&(v<150||v>450); break;
+      case 'bilirubin': abn=!isNaN(v)&&(v>1.2); break;
+      case 'sgot': abn=!isNaN(v)&&(v>40); break;
+      case 'sgpt': abn=!isNaN(v)&&(v>41); break;
+      case 'kreatinin': abn=!isNaN(v)&&(v<0.6||v>1.3); break;
+      case 'amilase': abn=!isNaN(v)&&(v>110); break;
+      case 'cpk': abn=!isNaN(v)&&(v>200); break;
+    }
+    el.classList.toggle('abn', abn);
+    updateDefinisiBadge();
+  });
+});
 
 // =====================
-// CRUD
+// CRUD DATA
 // =====================
 function norm(s){ return (s||"").toString().trim().toLowerCase().replace(/\s+/g,' '); }
-function getRecordDate(d){ return d.onset || d.tglPaparan || (d.savedAt ? d.savedAt.slice(0,10) : ""); }
 function getFormData(){
   const onsetDate=getOnsetDate();
   const gejala={}; const gejalaTgl={};
@@ -235,7 +266,7 @@ function renderTable(){
     const tr=document.createElement('tr');
     tr.innerHTML=`
       <td>${d.nama}</td><td>${d.umur}</td><td>${d.prov}</td><td>${d.kab}</td>
-      <td>${getRecordDate(d)||'-'}</td><td><span class="tag ${defClass(d.definisi)}">${d.definisi}</span></td>
+      <td>${d.onset||'-'}</td><td><span class="tag ${defClass(d.definisi)}">${d.definisi}</span></td>
       <td>${d.statusAkhir||'-'}</td><td><button class="btn small" data-del="${i}">Hapus</button></td>`;
     tbody.appendChild(tr);
   });
@@ -253,7 +284,7 @@ document.getElementById('simpan').addEventListener('click', e=>{
   if(typeof sendRowToSheets==='function'){ try{ sendRowToSheets(flattenCase(data)); }catch(_e){} }
   alert('Kasus disimpan.');
 });
-function duplicateKey(d){ return [norm(d.nama),norm(d.umur),norm(d.alamat),getRecordDate(d)||''].join('|'); }
+function duplicateKey(d){ return [norm(d.nama),norm(d.umur),norm(d.alamat),d.onset||''].join('|'); }
 document.getElementById('cekDup').addEventListener('click', ()=>{
   const arr=loadCases(); const seen={}; const dups=new Set();
   arr.forEach((d,i)=>{ const k=duplicateKey(d); if(seen[k]!==undefined){ dups.add(i); dups.add(seen[k]); } else { seen[k]=i; } });
@@ -263,171 +294,82 @@ document.getElementById('cekDup').addEventListener('click', ()=>{
 });
 document.getElementById('hapusDup').addEventListener('click', ()=>{
   const arr=loadCases(); const seen={}; const result=[];
-  arr.forEach(d=>{ const k=duplicateKey(d); if(!(k in seen)){ seen[k]=true; result.push(d); } });
+  arr.forEach(d=>{ const k=duplicateKey(d); if(!(k in seen)){ seen[k]=True; result.push(d); } });
   const removed=arr.length-result.length; saveCases(result);
   renderTable(); renderCounts(); updateCharts(); recalcCasesFromLocalAndRefresh();
   alert(removed>0?('Menghapus '+removed+' duplikat.'):'Tidak ada duplikat untuk dihapus.');
 });
 
 // =====================
-// CHARTS — helpers
+// CHARTS (Month/Year mode + prov/kab filter + onset fallback)
 // =====================
 let trendChart, kabChart;
-function createTrendChart(type){
-  const ctx=document.getElementById('trendChart').getContext('2d');
-  if(trendChart){ trendChart.destroy(); }
-  trendChart=new Chart(ctx,{type:type||'line',data:{labels:[],datasets:[{label:'Kasus',data:[]}]},options:{responsive:true,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false}},scales:{y:{beginAtZero:true}}}});
+function ensureCharts(){
+  const ctx1=document.getElementById('trendChart').getContext('2d');
+  const ctx2=document.getElementById('kabChart').getContext('2d');
+  if(!trendChart){ trendChart=new Chart(ctx1,{type:'line',data:{labels:[],datasets:[{label:'Kasus',data:[]}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}}); }
+  if(!kabChart){ kabChart=new Chart(ctx2,{type:'bar',data:{labels:[],datasets:[{label:'Kasus',data:[]}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}}); }
 }
-function createKabChart(type){
-  const ctx=document.getElementById('kabChart').getContext('2d');
-  if(kabChart){ kabChart.destroy(); }
-  kabChart=new Chart(ctx,{type:type||'bar',data:{labels:[],datasets:[{label:'Kasus',data:[]}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+ensureCharts();
+function getDateForAgg(d){
+  // fallback saat onset kosong → pakai tglStatus → savedAt (yyyy-mm-dd)
+  return d.onset || d.tglStatus || (d.savedAt ? d.savedAt.slice(0,10) : '');
 }
-createTrendChart(trendTypeSel.value);
-createKabChart(kabTypeSel.value);
-
-function monthKey(dateStr){ return dateStr.slice(0,7); } // YYYY-MM
-function yearKey(dateStr){ return dateStr.slice(0,4); }
-function addMonths(ym, delta){ // ym 'YYYY-MM'
-  const [y,m]=ym.split('-').map(Number); const d=new Date(y, m-1+delta, 1);
-  return d.toISOString().slice(0,7);
-}
-function generateMonthRange(startYM, endYM){
-  if(!startYM || !endYM) return [];
-  let cur=startYM; const arr=[];
-  while(cur<=endYM){ arr.push(cur); cur=addMonths(cur,1); }
-  return arr;
-}
-function generateYearRange(startY, endY){
-  if(!startY || !endY) return [];
-  const s=+startY, e=+endY; const arr=[];
-  for(let y=s; y<=e; y++){ arr.push(String(y)); }
-  return arr;
-}
-// auto defaults for month range based on data
-function inferMonthRange(data){
-  let min=null, max=null;
-  data.forEach(d=>{
-    const dt=getRecordDate(d); if(!dt) return;
-    const m=monthKey(dt);
-    if(!min || m<min) min=m;
-    if(!max || m>max) max=m;
-  });
-  return [min,max];
-}
-function inferYearRange(data){
-  let min=null, max=null;
-  data.forEach(d=>{
-    const dt=getRecordDate(d); if(!dt) return;
-    const y=yearKey(dt);
-    if(!min || y<min) min=y;
-    if(!max || y>max) max=y;
-  });
-  return [min,max];
-}
-
-// =====================
-// UPDATE CHARTS (tren + kab/kota)
-// =====================
+function monthKey(dateStr){ return dateStr ? dateStr.slice(0,7) : ''; }
+function yearKey(dateStr){ return dateStr ? dateStr.slice(0,4) : ''; }
+function withinRangeMonth(dateStr,start,end){ const m=monthKey(dateStr); if(!m) return false; if(start&&m<start) return false; if(end&&m>end) return false; return True; }
+function withinRangeYear(dateStr,ys,ye){ const y=yearKey(dateStr); if(!y) return false; if(ys&&y<ys) return false; if(ye&&y>ye) return false; return True; }
 function updateCharts(){
   const arr=loadCases();
-  // Filter prov/kab
-  const selProv=fProv.value||"";
-  const selKab=fKab.value||"";
-  let filtered=arr.filter(d=>{
-    if(selProv && d.prov!==selProv) return false;
-    if(selKab && d.kab!==selKab) return false;
-    return true;
+  const fp=fProv.value||""; const fk=fKab.value||"";
+  const mode=fTimeMode.value||'month';
+  const ms=fStart.value||""; const me=fEnd.value||"";
+  const ys=(fYearStart.value||''); const ye=(fYearEnd.value||'');
+  const filtered=arr.filter(d=>{
+    if(fp&&d.prov!==fp) return false;
+    if(fk&&d.kab!==fk) return false;
+    const ds=getDateForAgg(d);
+    if(mode==='month') return withinRangeMonth(ds,ms,me);
+    else return withinRangeYear(ds,ys,ye);
   });
-
-  // === Trend aggregation ===
-  const gran=trendGranSel.value; // 'month' | 'year'
-  let labels=[], series=[];
-
-  if(gran==='month'){
-    // Determine month range (use inputs or infer from data)
-    let start=fStart.value, end=fEnd.value;
-    if(!start || !end){
-      const [infS, infE]=inferMonthRange(filtered.length?filtered:arr);
-      start = start || infS;
-      end   = end   || infE;
-      // also set UI once if empty
-      if(!fStart.value && start) fStart.value = start;
-      if(!fEnd.value   && end)   fEnd.value   = end;
-    }
-    labels = generateMonthRange(start, end);
-    const perMonth={}; filtered.forEach(d=>{ const dt=getRecordDate(d); if(!dt) return; const k=monthKey(dt); perMonth[k]=(perMonth[k]||0)+1; });
-    series = labels.map(k=>perMonth[k]||0);
-  }else{ // year
-    let ys=yStart.value, ye=yEnd.value;
-    if(!ys || !ye){
-      const [infS, infE]=inferYearRange(filtered.length?filtered:arr);
-      ys = ys || infS; ye = ye || infE;
-      if(!yStart.value && ys) yStart.value = ys;
-      if(!yEnd.value   && ye) yEnd.value   = ye;
-    }
-    labels = generateYearRange(ys, ye);
-    const perYear={}; filtered.forEach(d=>{ const dt=getRecordDate(d); if(!dt) return; const k=yearKey(dt); perYear[k]=(perYear[k]||0)+1; });
-    series = labels.map(k=>perYear[k]||0);
-  }
-
-  // Re-create trend chart if type changed
-  const wantType = trendTypeSel.value;
-  if(!trendChart || trendChart.config.type!==wantType){ createTrendChart(wantType); }
-  trendChart.data.labels = labels;
-  trendChart.data.datasets[0].data = series;
-  trendChart.update();
-
-  // === Kab/Kota chart ===
-  const perKab={};
+  // Trend
+  const agg={};
   filtered.forEach(d=>{
-    const kk=d.kab || '(Tidak diisi)';
-    const dt=getRecordDate(d);
-    // respect time filters when month granularity selected
-    if(gran==='month' && fStart.value && fEnd.value && dt){
-      const mk=monthKey(dt);
-      if(mk < fStart.value || mk > fEnd.value) return;
-    }
-    if(gran==='year' && (yStart.value || yEnd.value) && dt){
-      const yk=yearKey(dt);
-      if(yStart.value && yk < yStart.value) return;
-      if(yEnd.value && yk > yEnd.value) return;
-    }
-    perKab[kk]=(perKab[kk]||0)+1;
+    const ds=getDateForAgg(d);
+    const key=(mode==='month')? monthKey(ds) : yearKey(ds);
+    if(!key) return;
+    agg[key]=(agg[key]||0)+1;
   });
-  let kabLabels=Object.keys(perKab);
-  // If no province selected, show top 10 kab/kota overall
-  if(!selProv){
-    kabLabels = kabLabels.sort((a,b)=>perKab[b]-perKab[a]).slice(0,10);
-  }else{
-    kabLabels = kabLabels.sort();
-  }
-  const kabSeries = kabLabels.map(k=>perKab[k]||0);
-  const wantKabType = kabTypeSel.value;
-  if(!kabChart || kabChart.config.type!==wantKabType){ createKabChart(wantKabType); }
-  kabChart.data.labels = kabLabels;
-  kabChart.data.datasets[0].data = kabSeries;
+  const keys=Object.keys(agg).sort();
+  trendChart.data.labels=keys;
+  trendChart.data.datasets[0].data=keys.map(k=>agg[k]||0);
+  trendChart.update();
+  trendTitle.textContent = mode==='month' ? 'Tren kasus per bulan' : 'Tren kasus per tahun';
+
+  // Per kab/kota (dari filtered)
+  const perKab={};
+  filtered.forEach(d=>{ const kk=d.kab||'(Tidak diisi)'; perKab[kk]=(perKab[kk]||0)+1; });
+  const kLabels=Object.keys(perKab).sort();
+  kabChart.data.labels=kLabels;
+  kabChart.data.datasets[0].data=kLabels.map(k=>perKab[k]||0);
   kabChart.update();
 }
-
-// listeners for controls
 document.getElementById('applyFilter').addEventListener('click', updateCharts);
-trendTypeSel.addEventListener('change', updateCharts);
-kabTypeSel.addEventListener('change', updateCharts);
-trendGranSel.addEventListener('change', () => {
-  const byYear = trendGranSel.value==='year';
-  yearRange.style.display = byYear ? '' : 'none';
-  // no forced clearing; keep inputs if user set them
-  updateCharts();
-});
-[fStart,fEnd,yStart,yEnd].forEach(el=> el.addEventListener('change', updateCharts));
+// Toggle UI range
+function applyTimeModeUI(){
+  const mode=fTimeMode.value;
+  document.getElementById('monthRange').classList.toggle('hidden', mode!=='month');
+  document.getElementById('yearRange').classList.toggle('hidden', mode!=='year');
+}
+fTimeMode.addEventListener('change', ()=>{ applyTimeModeUI(); updateCharts(); });
+applyTimeModeUI();
 
 // =====================
-// PETA CHOROPLETH (sama seperti sebelumnya)
+// PETA CHOROPLETH (init setelah unlock + invalidateSize)
 // =====================
 function getColor(val){ const v=Number(val)||0; if(v===0) return '#ffffff'; if(v>0&&v<=50) return '#ffc4c4'; if(v>50&&v<=200) return '#ff7a7a'; return '#cc0000'; }
-let map, geojsonLayer; let _labels=[];
-function ensureMap(){ if(map) return map; map=L.map('map',{zoomControl:true,attributionControl:false}); return map; }
+let geojsonLayer; let _labels=[]; window._leaf_map = null;
+function ensureMap(){ if(window._leaf_map) return window._leaf_map; window._leaf_map=L.map('map',{zoomControl:true,attributionControl:false}); window.addEventListener('resize', ()=>{ try{ window._leaf_map.invalidateSize(); }catch(_){}}); return window._leaf_map; }
 let casesByProvince={"Aceh":12,"Sumatera Utara":28,"Sumatera Barat":8,"Riau":15,"Jambi":5,"Sumatera Selatan":31,"Bengkulu":2,"Lampung":44,"Kepulauan Bangka Belitung":1,"Kepulauan Riau":3,"DKI Jakarta":320,"Jawa Barat":188,"Jawa Tengah":96,"DI Yogyakarta":45,"Jawa Timur":210,"Banten":74,"Bali":12,"Nusa Tenggara Barat":9,"Nusa Tenggara Timur":20,"Kalimantan Barat":6,"Kalimantan Tengah":4,"Kalimantan Selatan":11,"Kalimantan Timur":7,"Kalimantan Utara":1,"Sulawesi Utara":5,"Sulawesi Tengah":6,"Sulawesi Selatan":130,"Sulawesi Tenggara":4,"Gorontalo":1,"Sulawesi Barat":2,"Maluku":1,"Maluku Utara":1,"Papua Barat":1,"Papua":2,"Papua Selatan":0,"Papua Tengah":0,"Papua Pegunungan":0};
 function totalNational(){ return Object.values(casesByProvince).reduce((a,b)=>a+(+b||0),0); }
 function getProvName(props){ return props?.provinsi||props?.Provinsi||props?.PROVINSI||props?.NAME_1||props?.Name||props?.WADMPR||props?.wadmpr||props?.WADMPRV||props?.nama||props?.name||''; }
@@ -442,30 +384,58 @@ function onEachFeature(feature, layer){
   layer.on({mouseover:highlightFeature,mouseout:resetHighlight,click:()=>{ layer.bindPopup(`<b>${prov||'(tanpa nama)'}</b><br>Kasus: ${val.toLocaleString('id-ID')}<br>Kontribusi nasional: ${pct}%`).openPopup(); }});
 }
 function addCenterLabels(){
-  if(!map||!geojsonLayer) return;
-  _labels.forEach(l=>map.removeLayer(l)); _labels=[];
+  if(!window._leaf_map||!geojsonLayer) return;
+  _labels.forEach(l=>window._leaf_map.removeLayer(l)); _labels=[];
   geojsonLayer.eachLayer(layer=>{
     const prov=getProvName(layer.feature?.properties||{}); const val=+casesByProvince[prov]||0;
-    if(val>0){ const c=layer.getBounds().getCenter(); const t=L.tooltip({permanent:true,direction:'center',className:'prov-label'}).setContent(String(val)).setLatLng(c); _labels.push(t); t.addTo(map); }
+    if(val>0){ const c=layer.getBounds().getCenter(); const t=L.tooltip({permanent:true,direction:'center',className:'prov-label'}).setContent(String(val)).setLatLng(c); _labels.push(t); t.addTo(window._leaf_map); }
   });
 }
 const legend=L.control({position:'topright'});
 legend.onAdd=function(){ const div=L.DomUtil.create('div','legend'); div.innerHTML='<div class="legend-title">Kategori Kasus</div>'+'<div class="legend-row"><span class="swatch" style="background:#ffffff"></span>0</div>'+'<div class="legend-row"><span class="swatch" style="background:#ffc4c4"></span>1–50</div>'+'<div class="legend-row"><span class="swatch" style="background:#ff7a7a"></span>50–200</div>'+'<div class="legend-row"><span class="swatch" style="background:#cc0000"></span>&gt;200</div>'; return div; };
 function refreshChoropleth(){ geojsonLayer && geojsonLayer.setStyle(styleFeature); addCenterLabels(); }
-async function loadFromUrl(url){ const res=await fetch(url,{mode:'cors'}); if(!res.ok) throw new Error('Gagal fetch GeoJSON: '+res.status); return await res.json(); }
-function renderChoropleth(geojson){ ensureMap(); if(geojsonLayer) map.removeLayer(geojsonLayer); geojsonLayer=L.geoJSON(geojson,{style:styleFeature,onEachFeature:onEachFeature}).addTo(map); try{ map.fitBounds(geojsonLayer.getBounds(),{padding:[10,10]}); }catch(_){} if(!legend._map) legend.addTo(map); addCenterLabels(); }
-function exportPNG(){ if(!map){ alert('Peta belum dirender.'); return; } leafletImage(map,(err,canvas)=>{ if(err){ alert('Gagal membuat gambar: '+err); return; } const a=document.createElement('a'); a.download='choropleth.png'; a.href=canvas.toDataURL('image/png'); a.click(); }); }
+async function loadFromUrl(url){
+  try{
+    const res=await fetch(url,{mode:'cors',cache:'no-store'});
+    if(!res.ok) throw new Error('status '+res.status);
+    return await res.json();
+  }catch(err){
+    document.getElementById('mapMsg').textContent = 'Gagal memuat GeoJSON dari GitHub: '+err;
+    throw err;
+  }
+}
+function renderChoropleth(geojson){
+  ensureMap();
+  if(geojsonLayer) window._leaf_map.removeLayer(geojsonLayer);
+  geojsonLayer=L.geoJSON(geojson,{style:styleFeature,onEachFeature:onEachFeature}).addTo(window._leaf_map);
+  try{ fitIndonesia(); }catch(_){}
+  if(!legend._map) legend.addTo(window._leaf_map);
+  addCenterLabels();
+}
+function fitIndonesia(){ if(geojsonLayer){ window._leaf_map.fitBounds(geojsonLayer.getBounds(),{padding:[10,10]}); } }
+function exportPNG(){ if(!window._leaf_map){ alert('Peta belum dirender.'); return; } leafletImage(window._leaf_map,(err,canvas)=>{ if(err){ alert('Gagal membuat gambar: '+err); return; } const a=document.createElement('a'); a.download='choropleth.png'; a.href=canvas.toDataURL('image/png'); a.click(); }); }
 function recalcCasesByProvinceFromLocal(){ const arr=loadCases(); const counts={}; arr.forEach(d=>{ const p=d.prov||'(Tidak diisi)'; counts[p]=(counts[p]||0)+1; }); return counts; }
 function recalcCasesFromLocalAndRefresh(){ const counts=recalcCasesByProvinceFromLocal(); if(Object.keys(counts).length){ casesByProvince=counts; refreshChoropleth(); } }
 document.getElementById('recalcMap')?.addEventListener('click', ()=>recalcCasesFromLocalAndRefresh());
 document.getElementById('exportPng')?.addEventListener('click', exportPNG);
-(async function initMap(){ ensureMap(); try{ const data=await loadFromUrl(DEFAULT_GH); renderChoropleth(data); recalcCasesFromLocalAndRefresh(); }catch(err){ console.warn('Auto-load GeoJSON gagal:',err); } })();
+async function initMap(){
+  if(!unlocked) return; // jangan init sebelum unlock agar container visible
+  ensureMap();
+  try{
+    const data=await loadFromUrl(DEFAULT_GH);
+    renderChoropleth(data);
+    recalcCasesFromLocalAndRefresh();
+    document.getElementById('mapMsg').textContent = '';
+  }catch(err){
+    // sudah ditulis di mapMsg
+  }
+}
 
 // =====================
-// AUTO UPDATE + INIT
+// AUTO UPDATE & FILTERS
 // =====================
 const _root=document.querySelector('main');
-function _autoUpd(){ updateOnset(); updateDefinisiBadge(); updateCharts(); }
+function _autoUpd(){ updateOnset(); updateDefinisiBadge(); }
 _root.addEventListener('input', _autoUpd, true);
 _root.addEventListener('change', _autoUpd, true);
 updateOnset(); updateDefinisiBadge(); renderTable(); renderCounts(); updateCharts();
@@ -488,30 +458,21 @@ function exportToExcel(){ const arr=loadCases(); if(arr.length===0){ alert('Tida
 document.getElementById('exportExcel').addEventListener('click', exportToExcel);
 
 // =====================
-// GOOGLE SHEETS (opsional, no-cors)
+// GOOGLE SHEETS (optional; no-cors to avoid preflight)
 // =====================
 async function sendRowToSheets(row){
   if(!SHEETS_URL){ console.warn('SHEETS_URL kosong'); return; }
   try{
-    await fetch(SHEETS_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ token: ACCESS_TOKEN, action: 'append', row })
-    });
+    await fetch(SHEETS_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({ token: ACCESS_TOKEN, action:'append', row }) });
   }catch(e){ console.warn('Gagal kirim Sheets:', e); }
 }
 async function sendAllToSheets(){
   if(!SHEETS_URL){ alert('SHEETS_URL belum diisi.'); return; }
   const arr=loadCases(); if(!arr.length){ alert('Tidak ada data.'); return; }
   try{
-    await fetch(SHEETS_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ token: ACCESS_TOKEN, action: 'appendBatch', rows: arr.map(flattenCase) })
-    });
-    alert('Permintaan sync telah dikirim (mode no-cors). Cek Sheet Anda.');
+    await fetch(SHEETS_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({ token: ACCESS_TOKEN, action:'appendBatch', rows: arr.map(flattenCase) }) });
+    alert('Permintaan sync dikirim (no-cors). Cek Sheet Anda.');
   }catch(e){ alert('Gagal sync: '+e); }
 }
 document.getElementById('syncSheets')?.addEventListener('click', sendAllToSheets);
+
