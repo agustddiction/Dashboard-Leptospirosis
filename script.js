@@ -382,7 +382,7 @@ async function sendAllToSheets(){
   if(!SHEETS_URL){ alert('SHEETS_URL belum diisi.'); return; }
   const arr=loadCases(); if(!arr.length){ alert('Tidak ada data.'); return; }
   try{
-    await fetch(SHEETS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:ACCESS_TOKEN,action:'appendBatch',rows:arr.map(flattenCase)})});
+    await fetch(SHEETS_URL,{mode:'no-cors',headers:'Content-Type':'text/plain;charset=utf-8',body:JSON.stringify({token:ACCESS_TOKEN,action:'appendBatch',rows:arr.map(flattenCase)})});
     alert('Sync batch ke Google Sheets terkirim.');
   }catch(e){ alert('Gagal sync: '+e); }
 }
