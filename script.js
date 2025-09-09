@@ -5,15 +5,15 @@
 const ACCESS_TOKEN = 'ZOOLEPTO123';
 const DEFAULT_GH = 'https://raw.githubusercontent.com/agustddiction/Dashboard-Leptospirosis/main/provinsi.json';
 // Google Sheets WRITE (Apps Script /exec)
-const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbxFHgRel9-LTQTc0YIjy5G22BWk1RiqUjjDqCd8XE1Q4tF8h4t5r8X9WL-MwVZ2IyyYHg/exec';
+const SHEETS_URL = ''; // <-- tempel URL Web App /exec di sini
 // Google Sheets READ (GViz JSON). Isi SPREADSHEET_ID dan SHEET_NAME lalu publish sheet ke web
-const SPREADSHEET_ID = '1rcySn3UNzsEHCd7t7ld4f-pSBUTrbNDBDgvxjbLcRm4';
+const SPREADSHEET_ID = 'GANTI_DENGAN_ID_SHEET_ANDA';
 const SHEET_NAME = 'Kasus';
 const SHEETS_READ_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json`;
 
 // Auto tarik data
 const AUTO_PULL = true;
-const AUTO_PULL_INTERVAL_MS = 30*60*1000;
+const AUTO_PULL_INTERVAL_MS = 5*60*1000;
 
 // =====================
 // MASTER DATA
@@ -643,7 +643,7 @@ _root.addEventListener('keyup', _autoUpd, true);
 _root.addEventListener('click', _autoUpd, true);
 
 initGejalaChecklist(); initPaparanChecklist();
-updateOnset(); updateDefinisiBadge(); ensureUUIDs(); renderTable(); renderCounts(); updateCharts();
+updateOnset(); updateDefinisiBadge(); ensureUUIDs(); renderTable(); renderCounts(); updateCharts(); _bindHeaderShadow(); _syncTimeModeUI();
 
 // ============= TOKEN CORE (HARDENED) =============
 (function(){
@@ -698,3 +698,25 @@ updateOnset(); updateDefinisiBadge(); ensureUUIDs(); renderTable(); renderCounts
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', start); else start();
   window.__leptoToken={ verifyToken, showLock, afterUnlock };
 })();
+
+// Header shadow on scroll
+function _bindHeaderShadow(){
+  const h=document.querySelector('header'); if(!h) return;
+  const onscroll=()=>{ if(window.scrollY>4) h.classList.add('scrolled'); else h.classList.remove('scrolled'); };
+  window.addEventListener('scroll', onscroll, {passive:true}); onscroll();
+}
+
+function _syncTimeModeUI(){
+  const mode=(document.getElementById('fTimeMode')?.value)||'month';
+  const m1=document.getElementById('monthRange'); const m2=document.getElementById('monthRange2');
+  const y1=document.getElementById('yearRange'); const y2=document.getElementById('yearRange2');
+  if(mode==='month'){
+    m1?.classList.remove('inactive'); m2?.classList.remove('inactive');
+    y1?.classList.remove('active'); y2?.classList.remove('active');
+    y1?.classList.add('inactive'); y2?.classList.add('inactive');
+  }else{
+    y1?.classList.add('active'); y2?.classList.add('active');
+    m1?.classList.add('inactive'); m2?.classList.add('inactive');
+  }
+}
+document.getElementById('fTimeMode')?.addEventListener('change', ()=>{ _syncTimeModeUI(); updateCharts(); });

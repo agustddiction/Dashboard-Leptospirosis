@@ -268,12 +268,7 @@
               <button class="btn" id="applyFilter">Terapkan</button>
             </div>
           </div>
-          <div class="sheets-actions">
-            <button class="btn" id="pullSheets">Tarik dari Google Sheet</button>
-            <button class="btn" id="syncSheets">Kirim ke Google Sheet</button>
-            <span id="pullStatus" class="muted"></span>
           </div>
-        </div>
       </div>
 
       <div style="overflow:auto; margin-top:10px">
@@ -291,14 +286,14 @@
 
     <section id="grafik">
       <h2>Analisis & Grafik</h2>
-      <div class="row" style="flex-direction:column; gap:16px">
-        <div>
+      <div class="charts-grid">
+        <div class="chart-card">
           <label class="muted" id="trendTitle">Tren kasus per bulan</label>
-          <canvas id="trendChart" height="120"></canvas>
+          <canvas id="trendChart"></canvas>
         </div>
-        <div>
+        <div class="chart-card">
           <label class="muted">Sebaran kasus per kabupaten/kota</label>
-          <canvas id="kabChart" height="120"></canvas>
+          <canvas id="kabChart"></canvas>
         </div>
       </div>
     </section>
@@ -314,6 +309,16 @@
       <div id="map" aria-label="Peta persebaran kasus per provinsi"></div>
       <div id="mapMsg" class="muted" style="margin-top:8px"></div>
       <div class="footnote">Peta menggunakan GeoJSON provinsi dari tautan Anda (RAW GitHub). Background putih tanpa tile.</div>
+    </section>
+
+    <section id="sheetsSection">
+      <h2>Sinkronisasi Google Sheets</h2>
+      <div class="row">
+        <button class="btn" id="pullSheets">Tarik dari Google Sheet</button>
+        <button class="btn" id="syncSheets">Kirim ke Google Sheet</button>
+        <span id="pullStatus" class="muted" style="align-self:center"></span>
+      </div>
+      <div class="footnote">Pastikan Anda sudah mengisi <code>SHEETS_URL</code>, <code>SPREADSHEET_ID</code>, dan melakukan <em>Publish to web</em> pada sheet.</div>
     </section>
 
     <footer class="wrap" style="padding-bottom:48px">
