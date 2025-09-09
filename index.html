@@ -377,6 +377,8 @@
       <div class="footnote">Data disimpan di <em>localStorage</em> perangkat Anda. Ekspor/Integrasi (Google Sheets/API) dapat ditambahkan kemudian.</div>
     </footer>
   </main>
+<button id="openTokenBtn" class="btn" title="Masukkan token" style="position:fixed; right:18px; bottom:18px; z-index:999; opacity:.8">🔒 Token</button>
+
 
 <script>
 // === TOKEN GATE ===
@@ -400,14 +402,29 @@ function verifyToken(){
   }
 }
 (function(){
+  // URL helpers: ?token=... to auto-unlock, ?resetToken=1 to clear
+  const qs = new URLSearchParams(location.search);
+  if(qs.get('resetToken')==='1'){ localStorage.removeItem('lepto_token_ok'); }
+  const urlToken = (qs.get('token')||'').trim();
+
   const ok = localStorage.getItem('lepto_token_ok')==='1';
-  if(!ok) showLock();
+  if(!ok){
+    if(urlToken && urlToken === ACCESS_TOKEN){
+      localStorage.setItem('lepto_token_ok','1');
+    } else {
+      showLock();
+    }
+  }
   const btn = document.getElementById('unlockBtn');
   if(btn) btn.addEventListener('click', verifyToken);
   document.addEventListener('keydown', (e)=>{
     const lock = document.getElementById('lock');
     if(lock && e.key==='Enter') verifyToken();
+    // Shortcut: Alt+L opens token box anytime
+    if(e.altKey && (e.key==='l' || e.key==='L')) showLock();
   });
+  const openBtn = document.getElementById('openTokenBtn');
+  if(openBtn){ openBtn.addEventListener('click', showLock); }
 })();
 
 /** =========================
