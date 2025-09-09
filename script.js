@@ -4,7 +4,16 @@
 // =====================
 const ACCESS_TOKEN = 'ZOOLEPTO123';
 const DEFAULT_GH = 'https://raw.githubusercontent.com/agustddiction/Dashboard-Leptospirosis/main/provinsi.json';
-const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbxFHgRel9-LTQTc0YIjy5G22BWk1RiqUjjDqCd8XE1Q4tF8h4t5r8X9WL-MwVZ2IyyYHg/exec';
+const SHEETS_URL = ''; // WRITE endpoint (Apps Script /exec)
+
+// Force token screen every visit
+const REQUIRE_TOKEN_EVERY_LOAD = true;
+
+// Google Sheets READ (GViz JSON). Isi SPREADSHEET_ID dan SHEET_NAME:
+const SPREADSHEET_ID = 'GANTI_DENGAN_ID_SHEET_ANDA';
+const SHEET_NAME = 'Kasus';
+const SHEETS_READ_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json`;
+
 
 // =====================
 // TOKEN GATE
@@ -30,9 +39,8 @@ function verifyToken(){
 function autoUnlockFromURL(){ try{ const t=new URLSearchParams(location.search).get('token'); if(t===ACCESS_TOKEN){ localStorage.setItem('lepto_token_ok','1'); afterUnlock(); } }catch(e){} }
 (function(){
   const sp = new URLSearchParams(location.search);
-  const force = sp.get('forceToken')==='1';
-  const okStored = localStorage.getItem('lepto_token_ok')==='1';
-  const ok = (!force) && okStored;
+  const skip = sp.get('skipToken')==='1';
+  const ok = (!REQUIRE_TOKEN_EVERY_LOAD && localStorage.getItem('lepto_token_ok')==='1') || skip === true;
   if(!ok) showLock(); else afterUnlock();
   document.getElementById('unlockBtn')?.addEventListener('click', verifyToken);
   document.addEventListener('keydown', e=>{ const lock=document.getElementById('lock'); if(lock && !lock.classList.contains('hidden') && e.key==='Enter') verifyToken(); });
@@ -346,7 +354,7 @@ document.getElementById('cekDup').addEventListener('click', ()=>{
   arr.forEach((d,i)=>{ const k=duplicateKey(d); if(seen[k]!==undefined){ dups.add(i); dups.add(seen[k]); } else { seen[k]=i; } });
   const rows=document.querySelectorAll('#casesTable tbody tr');
   rows.forEach((tr,i)=>tr.classList.toggle('dup', dups.has(i)));
-  alert(duplikat.size?'Duplikat ditemukan & ditandai warna krem.':'Tidak ada duplikat.');
+  alert(dups.size?'Duplikat ditemukan & ditandai warna krem.':'Tidak ada duplikat.');
 });
 document.getElementById('hapusDup').addEventListener('click', ()=>{
   const arr=loadCases(); const seen={}; const result=[];
@@ -525,3 +533,73 @@ async function sendAllToSheets(){
   }catch(e){ alert('Gagal sync: '+e); }
 }
 document.getElementById('syncSheets')?.addEventListener('click', sendAllToSheets);
+
+// ======= GOOGLE SHEETS READ (GViz) =======
+async function pullFromSheets(){
+  if(!SPREADSHEET_ID || SPREADSHEET_ID.startsWith('GANTI_')){
+    alert('SPREADSHEET_ID belum diisi di script.js');
+    return;
+  }
+  try{
+    const res = await fetch(SHEETS_READ_URL, { mode:'cors' });
+    const text = await res.text();
+    // GViz returns JS: google.visualization.Query.setResponse({...});
+    const json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}')+1));
+    const table = json.table;
+    const headers = table.cols.map(c => c.label || c.id);
+    const rows = table.rows.map(r => (r.c||[]).map(c => (c? (c.v ?? '') : '')));
+    // Convert to our flat row objects using headers
+    const flat = rows.map(vals => {
+      const o={};
+      headers.forEach((h,i)=> o[h] = vals[i]);
+      return o;
+    });
+    // Map flat rows back to app structure (best-effort)
+    const cases = flat.map(r => ({
+      nama: r['Nama']||'',
+      jk: r['Jenis Kelamin']||'',
+      umur: r['Umur']||'',
+      kerja: r['Pekerjaan']||'',
+      prov: r['Provinsi']||'',
+      kab: r['Kab/Kota']||'',
+      alamat: r['Alamat']||'',
+      onset: r['Onset']||'',
+      tglPaparan: r['Tanggal Paparan']||'',
+      gejala: {}, gejalaTgl: {},
+      paparan: [],
+      lab: {
+        leukosit: r['Leukosit (x10^3/µL)']||'',
+        trombosit: r['Trombosit (x10^3/µL)']||'',
+        bilirubin: r['Bilirubin (mg/dL)']||'',
+        sgot: r['SGOT (U/L)']||'',
+        sgpt: r['SGPT (U/L)']||'',
+        kreatinin: r['Kreatinin (mg/dL)']||'',
+        amilase: r['Amilase (U/L)']||'',
+        cpk: r['CPK (U/L)']||'',
+        proteinuria: (r['Proteinuria']||'')==='Ya',
+        hematuria: (r['Hematuria']||'')==='Ya',
+        rdt: ((r['RDT']||'').toLowerCase().startsWith('pos')?'pos':((r['RDT']||'').toLowerCase().startsWith('neg')?'neg':'nd')),
+        mat: ((r['MAT']||'').toLowerCase().startsWith('pos')?'pos':((r['MAT']||'').toLowerCase().startsWith('neg')?'neg':'nd')),
+        pcr: ((r['PCR']||'').toLowerCase().startsWith('pos')?'pos':((r['PCR']||'').toLowerCase().startsWith('neg')?'neg':'nd')),
+        serovar: r['Serovar']||''
+      },
+      definisi: r['Definisi']||'',
+      statusAkhir: r['Status Akhir']||'',
+      tglStatus: r['Tanggal Status']||'',
+      obat: r['Obat']||'',
+      savedAt: r['Saved At']||new Date().toISOString()
+    }));
+    // Replace local storage
+    localStorage.setItem('lepto_cases', JSON.stringify(cases));
+    renderTable(); renderCounts(); updateCharts(); recalcCasesFromLocalAndRefresh();
+    alert('Data dari Google Sheet sudah dimuat ke aplikasi.');
+  }catch(e){
+    console.error('pullFromSheets error', e);
+    alert('Gagal menarik data dari Google Sheet. Pastikan Sheet di-publish ke web (File → Share → Publish to web).');
+  }
+}
+document.getElementById('pullSheets')?.addEventListener('click', pullFromSheets);
+
+// ======= GOOGLE SHEETS WRITE (Apps Script) =======
+// (Sudah ada sendRowToSheets + sendAllToSheets; hanya ganti alert supaya jelas)
+

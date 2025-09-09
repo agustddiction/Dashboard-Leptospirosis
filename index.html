@@ -220,7 +220,8 @@
         <button class="btn" id="cekDup">Cek Duplikat</button>
         <button class="btn destructive" id="hapusDup">Hapus Duplikat</button>
         <button class="btn" id="exportExcel">Ekspor Excel</button>
-        <button class="btn" id="syncSheets">Sync ke Google Sheets</button>
+        <button class="btn" id="pullSheets">Tarik dari Google Sheet</button>
+        <button class="btn" id="syncSheets">Kirim ke Google Sheet</button>
       </div>
     </section>
 
@@ -253,27 +254,21 @@
             <label>Sampai Tahun</label>
             <input id="fYearEnd" type="number" min="2000" max="2100" placeholder="mis. 2025"/>
           </div>
-          <div>
-            <label>Filter Provinsi</label>
-            <select id="fProv"></select>
-          </div>
-          <div>
-            <label>Filter Kabupaten/Kota</label>
-            <select id="fKab"></select>
-          </div>
+<div class="filters-pair">
+  <div>
+    <label>Filter Provinsi</label>
+    <select id="fProv"></select>
+  </div>
+  <div>
+    <label>Filter Kabupaten/Kota</label>
+    <select id="fKab"></select>
+  </div>
+</div>
+
           <div style="align-self:flex-end">
             <button class="btn" id="applyFilter">Terapkan</button>
           </div>
-          <div class="filters-pair">
-           <div>
-             <label>Filter Provinsi</label>
-             <select id="fProv"></select>
-           </div>
-           <div>
-             <label>Filter Kabupaten/Kota</label>
-             <select id="fKab"></select>
-           </div>
-         </div>
+        </div>
       </div>
       <div style="overflow:auto; margin-top:10px">
         <table class="table" id="casesTable">

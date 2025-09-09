@@ -50,7 +50,9 @@ body.locked{ overflow:hidden }
 .swatch{ width:14px; height:14px; border-radius:3px; border:1px solid var(--line); display:inline-block }
 .leaflet-tooltip.prov-label{ background:transparent; border:none; box-shadow:none; color:#333; font-weight:700; font-size:12px; text-shadow:0 0 2px #fff }
 .leaflet-interactive{ cursor:pointer }
+
+/* Keep province & kab/kota filters side-by-side */
 .filters-pair{ display:grid; grid-template-columns:1fr 1fr; gap:10px; align-items:end }
 @media (max-width:720px){
-  .filters-pair{ grid-template-columns:1fr } /* stack di layar kecil */
+  .filters-pair{ grid-template-columns:1fr } /* stack on phones */
 }
