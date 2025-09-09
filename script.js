@@ -5,15 +5,15 @@
 const ACCESS_TOKEN = 'ZOOLEPTO123';
 const DEFAULT_GH = 'https://raw.githubusercontent.com/agustddiction/Dashboard-Leptospirosis/main/provinsi.json';
 // Google Sheets WRITE (Apps Script /exec)
-const SHEETS_URL = ''; // <-- tempel URL Web App /exec di sini
+const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbxFHgRel9-LTQTc0YIjy5G22BWk1RiqUjjDqCd8XE1Q4tF8h4t5r8X9WL-MwVZ2IyyYHg/exec';
 // Google Sheets READ (GViz JSON). Isi SPREADSHEET_ID dan SHEET_NAME lalu publish sheet ke web
-const SPREADSHEET_ID = 'GANTI_DENGAN_ID_SHEET_ANDA';
+const SPREADSHEET_ID = '1rcySn3UNzsEHCd7t7ld4f-pSBUTrbNDBDgvxjbLcRm4';
 const SHEET_NAME = 'Kasus';
 const SHEETS_READ_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json`;
 
 // Auto tarik data
 const AUTO_PULL = true;
-const AUTO_PULL_INTERVAL_MS = 5*60*1000;
+const AUTO_PULL_INTERVAL_MS = 30*60*1000;
 
 // =====================
 // MASTER DATA
