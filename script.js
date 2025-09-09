@@ -88,13 +88,13 @@ let editingUUID = null;
 // =====================
 const ACCESS_TOKEN = 'ZOOLEPTO123';
 const DEFAULT_GH = 'https://raw.githubusercontent.com/agustddiction/Dashboard-Leptospirosis/main/provinsi.json';
-const SHEETS_URL = ''; // WRITE endpoint (Apps Script /exec)
+const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbxFHgRel9-LTQTc0YIjy5G22BWk1RiqUjjDqCd8XE1Q4tF8h4t5r8X9WL-MwVZ2IyyYHg/exec'; // WRITE endpoint (Apps Script /exec)
 
 // Force token screen every visit
 const REQUIRE_TOKEN_EVERY_LOAD = true;
 
 // Google Sheets READ (GViz JSON). Isi SPREADSHEET_ID dan SHEET_NAME:
-const SPREADSHEET_ID = 'GANTI_DENGAN_ID_SHEET_ANDA';
+const SPREADSHEET_ID = '1rcySn3UNzsEHCd7t7ld4f-pSBUTrbNDBDgvxjbLcRm4';
 const SHEET_NAME = 'Kasus';
 const SHEETS_READ_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json`;
 // Auto tarik data
