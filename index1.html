@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Dashboard Leptospirosis — Pencatatan Kasus</title>
+<!-- Libraries with CDN fallback -->
+<script>
+(function(){
+  function load(src){return new Promise(function(res){var s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=function(){res('ERR')}; document.head.appendChild(s);});}
+  // Load Chart.js from CDN, else fallback to local shim
+  window.__libs = {chart:false, xlsx:false};
+  load('https://cdn.jsdelivr.net/npm/chart.js').then(function(r){
+    if(r==='ERR'){ console.warn('CDN Chart.js gagal, pakai shim lokal'); return load('vendor/chartjs-shim.min.js'); }
+  }).then(function(){ window.__libs.chart = true; });
+
+  // Load XLSX; jika gagal kita akan fallback ke XLSXLite (lokal) lalu CSV
+  load('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js').then(function(r){
+    if(r==='ERR'){
+      console.warn('CDN XLSX gagal, coba XLSXLite lokal');
+      return load('vendor/xlsxlite.min.js').then(function(){ window.__libs.xlsx = true; });
+    } else {
+      window.__libs.xlsx = true;
+    }
+  });
+})();
+</script>
+<style>
+  :root{
+    --bg:#ffffff;
+    --fg:#111111;
+    --muted:#666666;
+    --line:#e5e7eb;
+    --accent:#111111;
+    --ok:#16a34a;
+    --warn:#ca8a04;
+    --bad:#dc2626;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--fg);
+    font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji";
+  }
+  header{
+    position:sticky; top:0; z-index:5; background:rgba(255,255,255,.85); backdrop-filter:saturate(180%) blur(8px);
+    border-bottom:1px solid var(--line);
+  }
+  .wrap{max-width:980px; margin:0 auto; padding:14px 18px;}
+  h1{font-size:20px; margin:0 0 4px}
+  .sub{font-size:12px; color:var(--muted)}
+  .badge{
+    position:absolute; right:18px; top:14px;
+    font-size:12px; border:1px solid var(--line); padding:6px 10px; border-radius:999px; background:#fff; 
+    letter-spacing:.2px;
+  }
+  main{max-width:980px; margin:0 auto; padding:18px}
+  section{
+    border:1px solid var(--line); border-radius:14px; padding:16px 14px; margin:14px 0; background:#fff;
+  }
+  section h2{font-size:16px; margin:0 0 12px}
+  .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  .grid-3{display:grid; grid-template-columns:repeat(3,1fr); gap:10px}
+  .grid-4{display:grid; grid-template-columns:repeat(4,1fr); gap:10px}
+  label{display:block; font-weight:600; font-size:12px; color:#333; margin:6px 0}
+  input[type=text], input[type=number], input[type=date], input[type=month], select, textarea {
+    width:100%; border:1px solid var(--line); border-radius:10px; padding:10px; background:#fff; color:var(--fg);
+    outline:none;
+  }
+  textarea{min-height:70px; resize:vertical}
+  .muted{color:var(--muted); font-size:12px}
+  .row{display:flex; gap:10px; flex-wrap:wrap}
+  .btn{
+    appearance:none; border:1px solid var(--line); background:#fff; color:#111; padding:9px 12px; border-radius:10px; cursor:pointer;
+  }
+  .btn:hover{background:#f7f7f7}
+  .btn.primary{background:#111; color:#fff; border-color:#111}
+  .btn.destructive{border-color:var(--bad); color:#fff; background:var(--bad)}
+  .btn.ghost{background:transparent}
+  .hr{height:1px; background:var(--line); margin:12px 0}
+  .symptom{display:flex; align-items:center; gap:8px; padding:6px 8px; border:1px solid var(--line); border-radius:10px}
+  .symptom input[type=date]{margin-left:auto; width:155px}
+  .hidden{display:none}
+  .table{
+    width:100%; border-collapse:collapse; font-size:13px; 
+  }
+  .table th, .table td{border-bottom:1px solid var(--line); padding:8px 6px; text-align:left; vertical-align:top}
+  .tag{display:inline-flex; align-items:center; gap:6px; padding:3px 8px; border-radius:999px; border:1px solid var(--line); font-size:11px}
+  .tag.ok{border-color:var(--ok); color:var(--ok)}
+  .tag.warn{border-color:var(--warn); color:var(--warn)}
+  .tag.bad{border-color:var(--bad); color:var(--bad)}
+  .dup{background:#fff7ed}
+  .abn{border-color:var(--bad)!important}
+  .sticky-filters{position:sticky; top:64px; z-index:3; background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px}
+  .footnote{font-size:11px; color:#666}
+  .right{margin-left:auto}
+  .case-counts{display:flex; gap:8px; flex-wrap:wrap}
+  .case-counts .tag{font-weight:600}
+  .small{font-size:12px}
+
+  /* Badge color states */
+  .badge.ok{ border-color: var(--ok); background: var(--ok); color:#fff; }
+  .badge.warn{ border-color: var(--warn); background: var(--warn); color:#fff; }
+  .badge.bad{ border-color: var(--bad); background: var(--bad); color:#fff; }
+  .badge.neutral{ border-color: var(--line); background:#fff; color:#111; }
+
+  /* Lock screen */
+  body.locked{overflow:hidden}
+  .lock{position:fixed; inset:0; z-index:9999; background:#ffffff; display:flex; align-items:center; justify-content:center; padding:24px}
+  .lock-card{width:100%; max-width:460px; border:1px solid var(--line); border-radius:16px; padding:20px; background:#fff; box-shadow:0 10px 30px rgba(0,0,0,.06)}
+  .lock-title{font-size:18px; font-weight:700; margin:0 0 6px}
+  .lock-sub{font-size:12px; color:var(--muted); margin-bottom:14px}
+  .lock-row{display:flex; gap:10px; align-items:center}
+  .lock-row input[type=text]{flex:1}
+  .lock-err{display:none; color:var(--bad); font-size:12px; margin-top:10px}
+
+  /* Radio pill choices (RDT/MAT/PCR) */
+  .choices{display:flex; gap:8px; flex-wrap:nowrap; white-space:nowrap; align-items:center; overflow:auto}
+  .choice{display:inline-flex; align-items:center; gap:8px; border:1px solid var(--line); border-radius:999px; padding:4px 10px; cursor:pointer; user-select:none; min-height:30px; line-height:1.2; font-size:12px}
+  .choice input{width:14px; height:14px; margin:0; accent-color:#111}
+</style>
+</head>
+<body>
+  <!-- Lock Screen -->
+  <div id="lock" class="lock hidden">
+    <div class="lock-card">
+      <div class="lock-title">Akses Terbatas</div>
+      <div class="lock-sub">Masukkan token untuk membuka dashboard.</div>
+      <div class="lock-row">
+        <input id="tokenInput" type="text" placeholder="Masukkan token…" autocomplete="off" />
+        <button id="unlockBtn" class="btn primary">Masuk</button>
+      </div>
+      <div id="lockErr" class="lock-err">Token salah. Coba lagi.</div>
+    </div>
+  </div>
+
+  <header>
+    <div class="wrap" style="position:relative">
+      <h1>Dashboard Pencatatan Kasus Leptospirosis</h1>
+      <div class="sub">Tema monokrom • Satu kolom memanjang • Data tersimpan lokal (browser)</div>
+      <div class="badge" id="defBadge">Definisi Kasus: —</div>
+    </div>
+  </header>
+
+  <main>
+    <section id="pasien">
+      <h2>Data Pasien</h2>
+      <div class="grid-2">
+        <div>
+          <label>Nama</label>
+          <input id="nama" type="text" placeholder="Nama lengkap pasien"/>
+        </div>
+        <div>
+          <label>Jenis Kelamin</label>
+          <select id="jk">
+            <option value="">Pilih...</option>
+            <option>Laki-laki</option>
+            <option>Perempuan</option>
+          </select>
+        </div>
+        <div>
+          <label>Umur (tahun)</label>
+          <input id="umur" type="number" min="0" max="120" placeholder="cth: 34"/>
+        </div>
+        <div>
+          <label>Pekerjaan</label>
+          <input id="kerja" type="text" placeholder="cth: Petani"/>
+        </div>
+        <div>
+          <label>Provinsi</label>
+          <select id="prov"></select>
+        </div>
+        <div>
+          <label>Kabupaten/Kota</label>
+          <select id="kab"></select>
+        </div>
+      </div>
+      <label>Alamat Lengkap (RT/RW, Kelurahan, Kecamatan/Dusun/Desa)</label>
+      <textarea id="alamat" placeholder="Tulis alamat lengkap..."></textarea>
+    </section>
+
+    <section id="gejala">
+      <h2>Riwayat Gejala</h2>
+      <div class="muted small">Centang gejala yang muncul. Jika dicentang, isi tanggal munculnya gejala. Onset otomatis diambil dari tanggal gejala paling awal.</div>
+      <div class="grid-2" id="gejalaGrid"><!-- injected --></div>
+      <div class="hr"></div>
+      <div class="row">
+        <div><span class="muted">Tanggal onset (otomatis)</span></div>
+        <div class="tag right" id="onsetTag">—</div>
+      </div>
+    </section>
+
+    <section id="kontak">
+      <h2>Riwayat Kontak</h2>
+      <div class="grid-2">
+        <div>
+          <label>Tanggal Perkiraan Paparan</label>
+          <input id="tglPaparan" type="date"/>
+        </div>
+      </div>
+      <label class="muted">Centang faktor risiko dalam 2 minggu terakhir</label>
+      <div class="grid-2" id="paparanGrid"><!-- injected --></div>
+    </section>
+
+    <section id="lab">
+      <h2>Hasil Pemeriksaan Lab</h2>
+      <div class="grid-3">
+        <div>
+          <label>Leukosit (x10³/µL) <span class="muted">(N: 3.5–10.5)</span></label>
+          <input id="leukosit" type="number" step="0.1" placeholder="cth: 7.2"/>
+        </div>
+        <div>
+          <label>Trombosit (x10³/µL) <span class="muted">(N: 150–450)</span></label>
+          <input id="trombosit" type="number" step="1" placeholder="cth: 180"/>
+        </div>
+        <div>
+          <label>Bilirubin total (mg/dL) <span class="muted">(N: 0.1–1.2)</span></label>
+          <input id="bilirubin" type="number" step="0.1" placeholder="cth: 1.8"/>
+        </div>
+        <div>
+          <label>SGOT/AST (U/L) <span class="muted">(N: ≤40)</span></label>
+          <input id="sgot" type="number" step="1" placeholder="cth: 32"/>
+        </div>
+        <div>
+          <label>SGPT/ALT (U/L) <span class="muted">(N: ≤41)</span></label>
+          <input id="sgpt" type="number" step="1" placeholder="cth: 28"/>
+        </div>
+        <div>
+          <label>Kreatinin (mg/dL) <span class="muted">(N: 0.6–1.3)</span></label>
+          <input id="kreatinin" type="number" step="0.1" placeholder="cth: 0.9"/>
+        </div>
+      </div>
+
+      <div class="grid-3" style="margin-top:10px">
+        <div>
+          <label>RDT</label>
+          <div class="choices" id="rdtChoices">
+            <label class="choice"><input type="radio" name="rdt" value="pos"> Positif</label>
+            <label class="choice"><input type="radio" name="rdt" value="neg"> Negatif</label>
+            <label class="choice"><input type="radio" name="rdt" value="nd"> Tidak diperiksa</label>
+          </div>
+        </div>
+        <div>
+          <label>Hasil MAT</label>
+          <div class="choices" id="matChoices">
+            <label class="choice"><input type="radio" name="mat" value="pos"> Positif</label>
+            <label class="choice"><input type="radio" name="mat" value="neg"> Negatif</label>
+            <label class="choice"><input type="radio" name="mat" value="nd"> Tidak diperiksa</label>
+          </div>
+        </div>
+        <div>
+          <label>Serovar (jika ada)</label>
+          <input id="serovar" type="text" placeholder="cth: L. icterohaemorrhagiae"/>
+        </div>
+      </div>
+
+      <details style="margin-top:10px">
+        <summary class="muted">Opsi Lanjutan (Amilase, CPK, Urinalisis, PCR)</summary>
+        <div class="grid-3" style="margin-top:10px">
+          <div>
+            <label>Amilase (U/L) <span class="muted">(N: 30–110)</span></label>
+            <input id="amilase" type="number" step="1" placeholder="cth: 95"/>
+          </div>
+          <div>
+            <label>CPK (U/L) <span class="muted">(N: 30–200)</span></label>
+            <input id="cpk" type="number" step="1" placeholder="cth: 190"/>
+          </div>
+          <div>
+            <label>PCR</label>
+            <div class="choices" id="pcrChoices">
+              <label class="choice"><input type="radio" name="pcr" value="pos"> Positif</label>
+              <label class="choice"><input type="radio" name="pcr" value="neg"> Negatif</label>
+              <label class="choice"><input type="radio" name="pcr" value="nd"> Tidak diperiksa</label>
+            </div>
+          </div>
+        </div>
+        <div class="grid-2" style="margin-top:10px">
+          <div class="symptom">
+            <input type="checkbox" id="proteinuria"/>
+            <label for="proteinuria" style="margin:0; font-weight:500">Proteinuria</label>
+          </div>
+          <div class="symptom">
+            <input type="checkbox" id="hematuria"/>
+            <label for="hematuria" style="margin:0; font-weight:500">Hematuria</label>
+          </div>
+        </div>
+      </details>
+
+      <div class="footnote">Rentang nilai normal bersifat indikatif; sesuaikan dengan referensi laboratorium setempat.</div>
+    </section>
+
+    <section id="status">
+      <h2>Status Akhir Pasien</h2>
+      <div class="grid-3">
+        <div>
+          <label>Status</label>
+          <select id="statusAkhir">
+            <option value="">Pilih...</option>
+            <option value="Sembuh">Sembuh</option>
+            <option value="Perawatan">Masih dalam perawatan</option>
+            <option value="Meninggal">Meninggal</option>
+          </select>
+        </div>
+        <div>
+          <label>Tanggal Status</label>
+          <input id="tglStatus" type="date"/>
+        </div>
+        <div>
+          <label>Pemberian Obat</label>
+          <input id="obat" type="text" placeholder="cth: Doksisiklin, Penicillin, dll."/>
+        </div>
+      </div>
+    </section>
+
+    <section id="aksi">
+      <div class="row">
+        <button class="btn primary" id="simpan">Simpan Kasus</button>
+        <button class="btn" id="reset">Reset Form</button>
+        <span class="right"></span>
+        <button class="btn" id="cekDup">Cek Duplikat</button>
+        <button class="btn destructive" id="hapusDup">Hapus Duplikat</button>
+        <button class="btn" id="exportExcel">Ekspor Excel</button>
+      </div>
+    </section>
+
+    <section id="tabel">
+      <h2>Data Kasus Tersimpan</h2>
+      <div class="case-counts" id="counts"></div>
+      <div class="hr"></div>
+      <div class="sticky-filters">
+        <div class="row">
+          <div style="flex:1; min-width:180px">
+            <label>Filter Provinsi</label>
+            <select id="fProv"></select>
+          </div>
+          <div style="flex:1; min-width:180px">
+            <label>Filter Kabupaten/Kota</label>
+            <select id="fKab"></select>
+          </div>
+          <div style="flex:1; min-width:180px">
+            <label>Dari Bulan</label>
+            <input id="fStart" type="month"/>
+          </div>
+          <div style="flex:1; min-width:180px">
+            <label>Sampai Bulan</label>
+            <input id="fEnd" type="month"/>
+          </div>
+          <div style="align-self:flex-end">
+            <button class="btn" id="applyFilter">Terapkan</button>
+          </div>
+        </div>
+      </div>
+      <div style="overflow:auto; margin-top:10px">
+        <table class="table" id="casesTable">
+          <thead>
+            <tr><th>Nama</th><th>Umur</th><th>Provinsi</th><th>Kab/Kota</th><th>Onset</th><th>Definisi</th><th>Status</th><th>Aksi</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="grafik">
+      <h2>Analisis & Grafik</h2>
+      <div class="row" style="flex-direction:column; gap:16px">
+        <div>
+          <label class="muted">Tren kasus per bulan (baris 1)</label>
+          <canvas id="trendChart" height="120"></canvas>
+        </div>
+        <div>
+          <label class="muted">Sebaran kasus per kabupaten/kota (baris 2)</label>
+          <canvas id="kabChart" height="120"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <footer class="wrap" style="padding-bottom:48px">
+      <div class="footnote">Data disimpan di <em>localStorage</em> perangkat Anda. Ekspor/Integrasi (Google Sheets/API) dapat ditambahkan kemudian.</div>
+    </footer>
+  </main>
+
+<script>
+// === TOKEN GATE ===
+const ACCESS_TOKEN = 'ZOOLEPTO123';
+function showLock(){
+  const lock = document.getElementById('lock');
+  if(lock){ lock.classList.remove('hidden'); document.body.classList.add('locked'); setTimeout(()=>{ const ti=document.getElementById('tokenInput'); ti && ti.focus(); }, 50); }
+}
+function hideLock(){
+  const lock = document.getElementById('lock');
+  if(lock){ lock.remove(); document.body.classList.remove('locked'); }
+}
+function verifyToken(){
+  const val = (document.getElementById('tokenInput')?.value||'').trim();
+  const err = document.getElementById('lockErr');
+  if(val === ACCESS_TOKEN){
+    localStorage.setItem('lepto_token_ok','1');
+    hideLock();
+  } else {
+    if(err){ err.textContent='Token salah. Coba lagi.'; err.style.display='block'; }
+  }
+}
+(function(){
+  const ok = localStorage.getItem('lepto_token_ok')==='1';
+  if(!ok) showLock();
+  const btn = document.getElementById('unlockBtn');
+  if(btn) btn.addEventListener('click', verifyToken);
+  document.addEventListener('keydown', (e)=>{
+    const lock = document.getElementById('lock');
+    if(lock && e.key==='Enter') verifyToken();
+  });
+})();
+
+/** =========================
+ *  DATA MASTER PROV-KAB (contoh ringkas; perlu dilengkapi)
+ *  ========================= */
+const PROV_KAB = {
+  "Aceh": ["Kabupaten Aceh Besar","Kabupaten Pidie","Kota Banda Aceh","Kota Lhokseumawe"],
+  "Sumatera Utara": ["Kabupaten Deli Serdang","Kota Medan","Kabupaten Karo","Kabupaten Asahan"],
+  "DKI Jakarta": ["Kep. Seribu","Jakarta Selatan","Jakarta Timur","Jakarta Pusat","Jakarta Barat","Jakarta Utara"],
+  "Jawa Barat": ["Kabupaten Bandung","Kabupaten Bogor","Kota Bandung","Kota Bogor"],
+  "Jawa Tengah": ["Kabupaten Banyumas","Kabupaten Semarang","Kota Semarang","Kota Surakarta"],
+  "DI Yogyakarta": ["Kabupaten Sleman","Kabupaten Bantul","Kota Yogyakarta"],
+  "Jawa Timur": ["Kabupaten Banyuwangi","Kabupaten Malang","Kota Surabaya","Kota Malang"],
+  "Bali": ["Kabupaten Badung","Kabupaten Gianyar","Kota Denpasar"],
+  "Sulawesi Selatan": ["Kabupaten Gowa","Kabupaten Maros","Kota Makassar"],
+  "Nusa Tenggara Timur": ["Kabupaten Timor Tengah Utara","Kota Kupang","Kabupaten Sikka"]
+};
+/** Gejala list with IDs to map to inputs */
+const GEJALA = [
+  {id:"demam", label:"Demam akut"},
+  {id:"nyeriKepala", label:"Nyeri kepala"},
+  {id:"mialgia", label:"Mialgia"},
+  {id:"malaise", label:"Malaise / Lemah"},
+  {id:"conj", label:"Conjunctival suffusion"},
+  {id:"nyeriBetis", label:"Nyeri betis"},
+  {id:"jaundice", label:"Jaundice / Ikterik"},
+  {id:"batuk", label:"Batuk dgn/tnp darah"},
+  {id:"perdarahan", label:"Manifestasi perdarahan"},
+  {id:"anuria", label:"Anuria / Oliguria"},
+  {id:"aritmia", label:"Aritmia jantung"},
+  {id:"ruam", label:"Ruam kulit"},
+  {id:"sesak", label:"Sesak napas"},
+];
+/** Faktor risiko paparan (2 minggu) */
+const PAPARAN = [
+  "Kontak dengan banjir",
+  "Kontak sungai/danau (mencuci, mandi, pekerjaan)",
+  "Sawah/perkebunan tanpa alas kaki",
+  "Kontak erat dengan hewan terinfeksi",
+  "Kontak dengan hewan mati/cairan infeksius",
+  "Menangani spesimen leptospirosis",
+  "Pekerjaan berisiko (drh hewan, RPH, pet shop, petani, pembersih selokan, dll.)",
+  "Hobi/olahraga/wisata (berenang, memancing, arung jeram, dll.)",
+];
+
+// DOM refs
+const prov = document.getElementById('prov');
+const kab = document.getElementById('kab');
+const fProv = document.getElementById('fProv');
+const fKab = document.getElementById('fKab');
+const fStart = document.getElementById('fStart');
+const fEnd = document.getElementById('fEnd');
+
+function initProvKab(){
+  const provs = Object.keys(PROV_KAB).sort();
+  const addOpts = (sel, items, withAll=false)=>{
+    sel.innerHTML = "";
+    if(withAll){ sel.append(new Option("Semua", "")); }
+    sel.append(new Option("Pilih...", ""));
+    items.forEach(x => sel.append(new Option(x, x)));
+  };
+  addOpts(prov, provs, false);
+  addOpts(fProv, provs, true);
+  const updateKab = (selKab, provName, withAll=false)=>{
+    selKab.innerHTML = "";
+    if(withAll){ selKab.append(new Option("Semua", "")); }
+    if(!provName || !PROV_KAB[provName]){ selKab.append(new Option("Pilih provinsi dulu", "")); return; }
+    PROV_KAB[provName].forEach(x => selKab.append(new Option(x, x)));
+  };
+  prov.addEventListener('change', ()=> updateKab(kab, prov.value, false));
+  fProv.addEventListener('change', ()=> updateKab(fKab, fProv.value, true));
+  // seed KAB filters initially
+  updateKab(kab, prov.value, false);
+  updateKab(fKab, fProv.value, true);
+}
+initProvKab();
+
+// Inject gejala checklist (2 kolom) with date inputs shown on check
+function initGejalaChecklist(){
+  const grid = document.getElementById('gejalaGrid');
+  GEJALA.forEach(g=>{
+    const wrap = document.createElement('div');
+    wrap.className = "symptom";
+    wrap.innerHTML = `
+      <input type="checkbox" id="g_${g.id}" data-symptom="${g.id}">
+      <label for="g_${g.id}" style="margin:0; font-weight:500">${g.label}</label>
+      <input type="date" id="d_${g.id}" class="hidden">
+    `;
+    grid.appendChild(wrap);
+    const cb = wrap.querySelector('input[type=checkbox]');
+    const dt = wrap.querySelector('input[type=date]');
+    cb.addEventListener('change', ()=>{
+      dt.classList.toggle('hidden', !cb.checked);
+      updateOnset();
+      updateDefinisiBadge();
+    });
+    dt.addEventListener('change', ()=>{
+      updateOnset();
+      updateDefinisiBadge();
+    });
+  });
+}
+initGejalaChecklist();
+
+// Inject paparan checklist (2 kolom)
+function initPaparanChecklist(){
+  const grid = document.getElementById('paparanGrid');
+  PAPARAN.forEach((p, idx)=>{
+    const wrap = document.createElement('div');
+    wrap.className = "symptom";
+    const id = 'p_'+idx;
+    wrap.innerHTML = `
+      <input type="checkbox" id="${id}">
+      <label for="${id}" style="margin:0; font-weight:500">${p}</label>
+    `;
+    grid.appendChild(wrap);
+    const cb = wrap.querySelector('input[type=checkbox]');
+    cb.addEventListener('change', updateDefinisiBadge);
+  });
+}
+initPaparanChecklist();
+
+function getOnsetDate(){
+  // earliest date across checked symptoms
+  let earliest = null;
+  GEJALA.forEach(g=>{
+    const cb = document.getElementById('g_'+g.id);
+    const dt = document.getElementById('d_'+g.id);
+    if(cb.checked && dt.value){
+      const d = new Date(dt.value);
+      if(!earliest || d < earliest) earliest = d;
+    }
+  });
+  return earliest;
+}
+function updateOnset(){
+  const onset = getOnsetDate();
+  const tag = document.getElementById('onsetTag');
+  tag.textContent = onset ? onset.toISOString().slice(0,10) : "—";
+}
+
+// Utility: normalize string for duplicate key
+function norm(s){ return (s||"").toString().trim().toLowerCase().replace(/\s+/g,' '); }
+
+// Case definition computation
+function computeDefinisi(){
+  // collect symptoms map
+  const S = {};
+  GEJALA.forEach(g=>{
+    S[g.id] = document.getElementById('g_'+g.id).checked;
+  });
+
+  // exposure in last 2 weeks: any checked
+  const anyExposure = PAPARAN.some((p,idx)=> document.getElementById('p_'+idx).checked );
+
+  // labs
+  const leuk = parseFloat(document.getElementById('leukosit').value);
+  const trom = parseFloat(document.getElementById('trombosit').value);
+  const bili = parseFloat(document.getElementById('bilirubin').value);
+  const amil = parseFloat(document.getElementById('amilase').value);
+  const cpk  = parseFloat(document.getElementById('cpk').value);
+  const proteinuria = document.getElementById('proteinuria').checked;
+  const hematuria   = document.getElementById('hematuria').checked;
+  const rdt = (document.querySelector('input[name="rdt"]:checked')?.value)||""; // pos/neg/nd/""
+  const mat = (document.querySelector('input[name="mat"]:checked')?.value)||"";
+  const pcr = (document.querySelector('input[name="pcr"]:checked')?.value)||"";
+
+  // SUSPEK:
+  // Demam ± nyeri kepala + (mialgia OR malaise OR conj) + riwayat paparan
+  const hasFever = !!S.demam;
+  const supportMinor = (S.mialgia || S.malaise || S.conj);
+  const suspek = hasFever && supportMinor && anyExposure;
+
+  // PROBABLE:
+  // 1) Suspek + min 2 dari daftar klinis berat
+  const severeList = [S.nyeriBetis, S.jaundice, S.anuria, S.perdarahan, S.sesak, S.aritmia, S.batuk, S.ruam];
+  const severeCount = severeList.filter(Boolean).length;
+  const crit1 = suspek && severeCount >= 2;
+
+  // 2) RDT positif
+  const crit2 = (rdt === 'pos');
+
+  // 3) Suspek + >=3 dari kriteria lab:
+  // a) Trombosit < 100
+  const labA = (!isNaN(trom) && trom < 100);
+  // b) Leukosit di luar 3.5–10.5
+  const labB = (!isNaN(leuk) && (leuk < 3.5 || leuk > 10.5));
+  // c) Bilirubin > 2 mg/dL ATAU Amilase tinggi ATAU CPK tinggi
+  const labC = ((!isNaN(bili) && bili > 2) || (!isNaN(amil) && amil > 110) || (!isNaN(cpk) && cpk > 200));
+  // d) proteinuria/hematuria
+  const labD = (proteinuria || hematuria);
+  const labCount = [labA, labB, labC, labD].filter(Boolean).length;
+  const crit3 = suspek && labCount >= 3;
+
+  const probable = (crit1 || crit2 || crit3);
+
+  // CONFIRMED:
+  const confirmed = ( (suspek || probable) && (mat === 'pos' || pcr === 'pos') );
+
+  let def = "Tidak memenuhi";
+  if(confirmed) def = "Confirm";
+  else if(probable) def = "Probable";
+  else if(suspek) def = "Suspek";
+  return def;
+}
+
+function updateDefinisiBadge(){
+  const def = computeDefinisi();
+  const badge = document.getElementById('defBadge');
+  badge.textContent = "Definisi Kasus: " + def;
+  badge.classList.remove('ok','warn','bad','neutral');
+  let cls = 'neutral';
+  if(def === 'Confirm') cls = 'ok';
+  else if(def === 'Probable') cls = 'warn';
+  else if(def === 'Suspek') cls = 'neutral';
+  else cls = 'bad';
+  badge.classList.add(cls);
+}
+// auto update definisi di semua isian
+document.addEventListener('input', (e)=>{
+  if(e.target && e.target.matches('input, select, textarea')) updateDefinisiBadge();
+});
+document.addEventListener('change', (e)=>{
+  if(e.target && e.target.matches('input, select, textarea')) updateDefinisiBadge();
+});
+
+// highlight abnormal labs
+['leukosit','trombosit','bilirubin','sgot','sgpt','kreatinin','amilase','cpk'].forEach(id=>{
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.addEventListener('input', ()=>{
+    const v = parseFloat(el.value);
+    let abn=false;
+    switch(id){
+      case 'leukosit': abn = !isNaN(v) && (v<3.5 || v>10.5); break;
+      case 'trombosit': abn = !isNaN(v) && (v<150 || v>450); break;
+      case 'bilirubin': abn = !isNaN(v) && (v>1.2); break;
+      case 'sgot': abn = !isNaN(v) && (v>40); break;
+      case 'sgpt': abn = !isNaN(v) && (v>41); break;
+      case 'kreatinin': abn = !isNaN(v) && (v<0.6 || v>1.3); break;
+      case 'amilase': abn = !isNaN(v) && (v>110); break;
+      case 'cpk': abn = !isNaN(v) && (v>200); break;
+    }
+    el.classList.toggle('abn', abn);
+    updateDefinisiBadge();
+  });
+});
+
+// Form save/reset
+function getFormData(){
+  const onsetDate = getOnsetDate();
+  const gejala = {};
+  const gejalaTgl = {};
+  GEJALA.forEach(g=>{
+    gejala[g.label] = document.getElementById('g_'+g.id).checked;
+    const d = document.getElementById('d_'+g.id).value || "";
+    gejalaTgl[g.label] = d;
+  });
+  const paparan = PAPARAN.map((p,idx)=> ({label:p, checked: document.getElementById('p_'+idx).checked}));
+  const data = {
+    nama: document.getElementById('nama').value,
+    jk: document.getElementById('jk').value,
+    umur: document.getElementById('umur').value,
+    kerja: document.getElementById('kerja').value,
+    prov: document.getElementById('prov').value,
+    kab: document.getElementById('kab').value,
+    alamat: document.getElementById('alamat').value,
+    gejala, gejalaTgl,
+    onset: onsetDate ? onsetDate.toISOString().slice(0,10) : "",
+    tglPaparan: document.getElementById('tglPaparan').value,
+    paparan,
+    lab: {
+      leukosit: document.getElementById('leukosit').value,
+      trombosit: document.getElementById('trombosit').value,
+      bilirubin: document.getElementById('bilirubin').value,
+      sgot: document.getElementById('sgot').value,
+      sgpt: document.getElementById('sgpt').value,
+      kreatinin: document.getElementById('kreatinin').value,
+      rdt: (document.querySelector('input[name="rdt"]:checked')?.value)||'',
+      mat: (document.querySelector('input[name="mat"]:checked')?.value)||'',
+      serovar: document.getElementById('serovar').value,
+      amilase: document.getElementById('amilase').value,
+      cpk: document.getElementById('cpk').value,
+      proteinuria: document.getElementById('proteinuria').checked,
+      hematuria: document.getElementById('hematuria').checked,
+      pcr: (document.querySelector('input[name="pcr"]:checked')?.value)||'',
+    },
+    statusAkhir: document.getElementById('statusAkhir').value,
+    tglStatus: document.getElementById('tglStatus').value,
+    obat: document.getElementById('obat').value,
+    definisi: computeDefinisi(),
+    savedAt: new Date().toISOString()
+  };
+  return data;
+}
+
+function resetForm(){
+  document.querySelectorAll('input, select, textarea').forEach(el=>{
+    if(el.type === 'checkbox' || el.type === 'radio') el.checked = false;
+    else el.value = '';
+  });
+  // keep province options
+  initProvKab();
+  updateOnset();
+  updateDefinisiBadge();
+}
+document.getElementById('reset').addEventListener('click', (e)=>{ e.preventDefault(); resetForm(); });
+
+function loadCases(){
+  try{
+    return JSON.parse(localStorage.getItem('lepto_cases') || '[]');
+  }catch(e){ return []; }
+}
+function saveCases(arr){
+  localStorage.setItem('lepto_cases', JSON.stringify(arr));
+}
+
+function renderCounts(){
+  const data = loadCases();
+  const counts = {Suspek:0, Probable:0, Confirm:0, Other:0};
+  data.forEach(d=>{
+    if(d.definisi === 'Suspek') counts.Suspek++;
+    else if(d.definisi === 'Probable') counts.Probable++;
+    else if(d.definisi === 'Confirm') counts.Confirm++;
+    else counts.Other++;
+  });
+  const box = document.getElementById('counts');
+  box.innerHTML = '';
+  Object.entries(counts).forEach(([k,v])=>{
+    const span = document.createElement('span');
+    const cls = k==='Confirm' ? 'ok' : (k==='Probable' ? 'warn' : (k==='Suspek' ? '' : ''));
+    span.className = 'tag '+cls;
+    span.textContent = k+': '+v;
+    box.appendChild(span);
+  });
+}
+
+function defClass(def){
+  if(def === 'Confirm') return 'ok';
+  if(def === 'Probable') return 'warn';
+  if(def === 'Suspek') return '';
+  return 'bad';
+}
+function renderTable(){
+  const tbody = document.querySelector('#casesTable tbody');
+  tbody.innerHTML = '';
+  const data = loadCases();
+  data.forEach((d, idx)=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${d.nama}</td>
+      <td>${d.umur}</td>
+      <td>${d.prov}</td>
+      <td>${d.kab}</td>
+      <td>${d.onset || '-'}</td>
+      <td><span class="tag ${defClass(d.definisi)}">${d.definisi}</span></td>
+      <td>${d.statusAkhir || '-'}</td>
+      <td><button class="btn small" data-del="${idx}">Hapus</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+  // delete actions
+  tbody.querySelectorAll('button[data-del]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const i = parseInt(btn.getAttribute('data-del'), 10);
+      const arr = loadCases();
+      arr.splice(i,1);
+      saveCases(arr);
+      renderTable(); renderCounts(); updateCharts();
+    });
+  });
+}
+
+document.getElementById('simpan').addEventListener('click', (e)=>{
+  e.preventDefault();
+  const data = getFormData();
+  // Basic validation
+  if(!data.nama){ alert('Nama wajib diisi.'); return; }
+  if(!data.prov || !data.kab){ alert('Provinsi dan Kabupaten/Kota wajib dipilih.'); return; }
+  const arr = loadCases();
+  arr.push(data);
+  saveCases(arr);
+  renderTable(); renderCounts(); updateCharts();
+  alert('Kasus disimpan.');
+});
+
+// Duplicate detection/removal
+function duplicateKey(d){
+  return [norm(d.nama), norm(d.umur), norm(d.alamat), d.onset || ''].join('|');
+}
+document.getElementById('cekDup').addEventListener('click', ()=>{
+  const arr = loadCases();
+  const seen = {};
+  const dups = new Set();
+  arr.forEach((d, i)=>{
+    const k = duplicateKey(d);
+    if(seen[k] !== undefined){ dups.add(i); dups.add(seen[k]); } else { seen[k] = i; }
+  });
+  // highlight
+  const rows = document.querySelectorAll('#casesTable tbody tr');
+  rows.forEach((tr, i)=> tr.classList.toggle('dup', dups.has(i)));
+  alert(duplikatMsg(dups.size));
+});
+function duplikatMsg(n){
+  return n ? 'Duplikat ditemukan & ditandai warna krem.' : 'Tidak ada duplikat.';
+}
+
+document.getElementById('hapusDup').addEventListener('click', ()=>{
+  const arr = loadCases();
+  const seen = {};
+  const result = [];
+  arr.forEach(d=>{
+    const k = duplicateKey(d);
+    if(!(k in seen)){ seen[k]=true; result.push(d); }
+  });
+  const removed = arr.length - result.length;
+  saveCases(result);
+  renderTable(); renderCounts(); updateCharts();
+  alert(removed>0 ? ('Menghapus '+removed+' duplikat.') : 'Tidak ada duplikat untuk dihapus.');
+});
+
+// Charts
+let trendChart, kabChart;
+function ensureCharts(){
+  const ctx1 = document.getElementById('trendChart').getContext('2d');
+  const ctx2 = document.getElementById('kabChart').getContext('2d');
+  if(!trendChart){
+    trendChart = new Chart(ctx1, {
+      type:'line',
+      data:{labels:[], datasets:[{label:'Kasus / bulan', data:[]}]},
+      options:{
+        responsive:true,
+        plugins:{legend:{display:false}},
+        scales:{y:{beginAtZero:true}}
+      }
+    });
+  }
+  if(!kabChart){
+    kabChart = new Chart(ctx2, {
+      type:'bar',
+      data:{labels:[], datasets:[{label:'Kasus / kabupaten-kota', data:[]}]},
+      options:{
+        responsive:true,
+        plugins:{legend:{display:false}},
+        scales:{y:{beginAtZero:true}}
+      }
+    });
+  }
+}
+ensureCharts();
+
+function monthKey(d){ return d.slice(0,7); } // YYYY-MM
+function withinRange(d, start, end){
+  const m = monthKey(d);
+  if(start && m < start) return false;
+  if(end && m > end) return false;
+  return true;
+}
+
+function updateCharts(){
+  const arr = loadCases();
+  // filters
+  const fp = fProv.value || "";
+  const fk = fKab.value || "";
+  const ms = fStart.value || "";
+  const me = fEnd.value || "";
+
+  const filtered = arr.filter(d=>{
+    if(fp && d.prov !== fp) return false;
+    if(fk && d.kab !== fk) return false;
+    if(d.onset){
+      if(!withinRange(d.onset, ms, me)) return false;
+    }else{
+      // if onset unknown, exclude from time trend
+    }
+    return true;
+  });
+
+  // aggregate by month
+  const perMonth = {};
+  filtered.forEach(d=>{
+    if(!d.onset) return;
+    const m = monthKey(d.onset);
+    perMonth[m] = (perMonth[m]||0)+1;
+  });
+  const mKeys = Object.keys(perMonth).sort();
+  trendChart.data.labels = mKeys;
+  trendChart.data.datasets[0].data = mKeys.map(k=>perMonth[k]||0);
+  trendChart.update();
+
+  // aggregate by kabupaten/kota
+  const perKab = {};
+  filtered.forEach(d=>{
+    const kk = d.kab || '(Tidak diisi)';
+    perKab[kk] = (perKab[kk]||0)+1;
+  });
+  const kLabels = Object.keys(perKab).sort();
+  kabChart.data.labels = kLabels;
+  kabChart.data.datasets[0].data = kLabels.map(k=>perKab[k]||0);
+  kabChart.update();
+}
+document.getElementById('applyFilter').addEventListener('click', ()=>{
+  updateCharts();
+});
+
+// Export to Excel (XLSX)
+function flattenCase(d){
+  const row = {
+    'Nama': d.nama,
+    'Jenis Kelamin': d.jk,
+    'Umur': d.umur,
+    'Pekerjaan': d.kerja,
+    'Provinsi': d.prov,
+    'Kab/Kota': d.kab,
+    'Alamat': d.alamat,
+    'Onset': d.onset,
+    'Tanggal Paparan': d.tglPaparan,
+    'Definisi': d.definisi,
+    'Status Akhir': d.statusAkhir,
+    'Tanggal Status': d.tglStatus,
+    'Obat': d.obat,
+    'Saved At': d.savedAt
+  };
+  // Gejala (boolean + tanggal)
+  GEJALA.forEach(g=>{
+    const label = g.label;
+    row['Gejala: '+label] = d.gejala[label] ? 'Ya' : '';
+    row['Tgl '+label] = d.gejalaTgl[label] || '';
+  });
+  // Paparan
+  row['Paparan (2 minggu)'] = (d.paparan||[]).filter(x=>x.checked).map(x=>x.label).join('; ');
+  // Lab
+  const L = d.lab||{};
+  row['Leukosit (x10^3/µL)'] = L.leukosit||'';
+  row['Trombosit (x10^3/µL)'] = L.trombosit||'';
+  row['Bilirubin (mg/dL)'] = L.bilirubin||'';
+  row['SGOT (U/L)'] = L.sgot||'';
+  row['SGPT (U/L)'] = L.sgpt||'';
+  row['Kreatinin (mg/dL)'] = L.kreatinin||'';
+  row['Amilase (U/L)'] = L.amilase||'';
+  row['CPK (U/L)'] = L.cpk||'';
+  row['Proteinuria'] = L.proteinuria ? 'Ya' : '';
+  row['Hematuria'] = L.hematuria ? 'Ya' : '';
+  const map3 = v => v==='pos'?'Positif':(v==='neg'?'Negatif':(v==='nd'?'Tidak diperiksa':''));
+  row['RDT'] = map3(L.rdt);
+  row['MAT'] = map3(L.mat);
+  row['PCR'] = map3(L.pcr);
+  row['Serovar'] = L.serovar||'';
+  return row;
+}
+function exportToExcel(){
+  const arr = loadCases();
+  if(arr.length===0){ alert('Tidak ada data untuk diekspor.'); return; }
+  const rows = arr.map(flattenCase);
+
+  if(window.XLSX){
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Kasus');
+    XLSX.writeFile(wb, 'leptospirosis_cases.xlsx');
+  } else if (window.XLSXLite){
+    XLSXLite.writeFile(rows, 'leptospirosis_cases.xlsx');
+  } else {
+    // CSV fallback
+    const headers = Object.keys(rows[0] || {});
+    const esc = (v) => {
+      v = (v===undefined||v===null) ? '' : String(v);
+      if(/[",
+]/.test(v)) return '"'+v.replace(/"/g,'""')+'"';
+      return v;
+    };
+    const csv = [headers.map(esc).join(',')]
+      .concat(rows.map(r => headers.map(h => esc(r[h])).join(',')))
+      .join('
+');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'leptospirosis_cases.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+}
+const exportBtn = document.getElementById('exportExcel');
+if(exportBtn){ exportBtn.addEventListener('click', exportToExcel); }
+
+// init
+updateOnset();
+updateDefinisiBadge();
+renderTable();
+renderCounts();
+updateCharts();
+</script>
+</body>
+</html>
