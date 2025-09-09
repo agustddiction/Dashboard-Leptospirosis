@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Dashboard Leptospirosis</title>
+<title>Dashboard Leptospirosis — Pencatatan Kasus</title>
 <link rel="stylesheet" href="style.css" />
 <!-- Chart.js & XLSX -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -29,8 +29,8 @@
 
   <header>
     <div class="wrap" style="position:relative">
-      <h1>Dashboard Leptospirosis</h1>
-      <div class="sub">Pencatatan dan Pelaporan Kasus Leptospirosis</div>
+      <h1>Dashboard Pencatatan Kasus Leptospirosis</h1>
+      <div class="sub">Tema monokrom • Satu kolom memanjang • Data tersimpan lokal (browser)</div>
       <div class="badge neutral" id="defBadge">Definisi Kasus: —</div>
     </div>
   </header>
@@ -68,13 +68,13 @@
           <select id="kab"></select>
         </div>
       </div>
-      <label>Alamat Lengkap (RT/RW/Dusun/Desa/Kelurahan/Kecamatan)</label>
+      <label>Alamat Lengkap (RT/RW, Kelurahan, Kecamatan/Dusun/Desa)</label>
       <textarea id="alamat" placeholder="Tulis alamat lengkap..."></textarea>
     </section>
 
     <section id="gejala">
       <h2>Riwayat Gejala</h2>
-      <div class="muted small">Centang gejala yang muncul dan isi tanggal munculnya gejala</div>
+      <div class="muted small">Centang gejala yang muncul. Jika dicentang, isi tanggal munculnya gejala. Onset otomatis diambil dari tanggal gejala paling awal.</div>
       <div class="grid-2" id="gejalaGrid"></div>
       <div class="hr"></div>
       <div class="row">
@@ -181,6 +181,29 @@
       <div class="footnote">Rentang nilai normal bersifat indikatif; sesuaikan dengan referensi laboratorium setempat.</div>
     </section>
 
+    <section id="status">
+      <h2>Status Akhir Pasien</h2>
+      <div class="grid-3">
+        <div>
+          <label>Status</label>
+          <select id="statusAkhir">
+            <option value="">Pilih...</option>
+            <option value="Sembuh">Sembuh</option>
+            <option value="Perawatan">Masih dalam perawatan</option>
+            <option value="Meninggal">Meninggal</option>
+          </select>
+        </div>
+        <div>
+          <label>Tanggal Status</label>
+          <input id="tglStatus" type="date"/>
+        </div>
+        <div>
+          <label>Pemberian Obat</label>
+          <input id="obat" type="text" placeholder="cth: Doksisiklin, Penicillin, dll."/>
+        </div>
+      </div>
+    </section>
+
     <section id="aksi">
       <div class="row">
         <button class="btn primary" id="simpan">Simpan Kasus</button>
@@ -198,24 +221,46 @@
       <div class="case-counts" id="counts"></div>
       <div class="hr"></div>
       <div class="sticky-filters">
-        <div class="row">
-          <div class="group" style="flex:1; min-width:180px">
+        <div class="time-toggle">
+          <div>
+            <label>Mode Waktu</label>
+            <select id="fTimeMode">
+              <option value="month">Bulan</option>
+              <option value="year">Tahun</option>
+            </select>
+          </div>
+
+          <div id="monthRange" class="group">
+            <div>
+              <label>Dari Bulan</label>
+              <input id="fStart" type="month"/>
+            </div>
+            <div>
+              <label>Sampai Bulan</label>
+              <input id="fEnd" type="month"/>
+            </div>
+          </div>
+
+          <div id="yearRange" class="group hidden">
+            <div>
+              <label>Dari Tahun</label>
+              <input id="fYearStart" class="year" type="number" min="2000" max="2100" placeholder="mis. 2023"/>
+            </div>
+            <div>
+              <label>Sampai Tahun</label>
+              <input id="fYearEnd" class="year" type="number" min="2000" max="2100" placeholder="mis. 2025"/>
+            </div>
+          </div>
+
+          <div>
             <label>Filter Provinsi</label>
             <select id="fProv"></select>
           </div>
-          <div class="group" style="flex:1; min-width:180px">
+          <div>
             <label>Filter Kabupaten/Kota</label>
             <select id="fKab"></select>
           </div>
-          <div class="group" style="flex:1; min-width:180px">
-            <label>Dari Bulan</label>
-            <input id="fStart" type="month"/>
-          </div>
-          <div class="group" style="flex:1; min-width:180px">
-            <label>Sampai Bulan</label>
-            <input id="fEnd" type="month"/>
-          </div>
-          <div class="group" style="align-self:flex-end">
+          <div style="align-self:flex-end">
             <button class="btn" id="applyFilter">Terapkan</button>
           </div>
         </div>
@@ -232,52 +277,33 @@
 
     <section id="grafik">
       <h2>Analisis & Grafik</h2>
-
-      <div class="controls">
-        <div class="group" style="min-width:160px">
-          <label>Jenis Grafik Tren</label>
-          <select id="trendType">
-            <option value="line">Garis (Line)</option>
-            <option value="bar">Batang (Bar)</option>
-          </select>
+      <div class="row" style="flex-direction:column; gap:16px">
+        <div>
+          <label class="muted" id="trendTitle">Tren kasus per bulan</label>
+          <canvas id="trendChart" height="120"></canvas>
         </div>
-        <div class="group" style="min-width:160px">
-          <label>Granularitas Tren</label>
-          <select id="trendGran">
-            <option value="month">Per Bulan</option>
-            <option value="year">Per Tahun</option>
-          </select>
+        <div>
+          <label class="muted">Sebaran kasus per kabupaten/kota</label>
+          <canvas id="kabChart" height="120"></canvas>
         </div>
-        <div class="group" id="yearRange" style="display:none; min-width:220px">
-          <label>Rentang Tahun</label>
-          <div class="row" style="gap:6px">
-            <input type="number" id="yStart" placeholder="Awal" min="2000" style="max-width:100px">
-            <input type="number" id="yEnd" placeholder="Akhir" min="2000" style="max-width:100px">
-          </div>
-        </div>
-        <div class="group" style="min-width:160px">
-          <label>Jenis Grafik Kab/Kota</label>
-          <select id="kabType">
-            <option value="bar">Batang (Bar)</option>
-            <option value="line">Garis (Line)</option>
-          </select>
-        </div>
-      </div>
-
-      <div>
-        <label class="muted">Tren kasus</label>
-        <canvas id="trendChart" height="120"></canvas>
-      </div>
-      <div style="margin-top:16px">
-        <label class="muted">Sebaran kasus per kabupaten/kota</label>
-        <canvas id="kabChart" height="120"></canvas>
-        <div class="small-note">10 kab/kota dengan kasus terbanyak dari seluruh data.</div>
       </div>
     </section>
 
     <section id="peta">
       <h2 aria-label="Judul peta">Sebaran Jumlah Kasus Leptospirosis per Provinsi, Indonesia</h2>
+      <div class="sub" style="margin-top:-6px">Contoh data — ganti dengan data aktual</div>
+      <div class="row" style="margin-top:12px">
+        <button id="recalcMap" class="btn" title="Hitung peta berdasarkan data tersimpan">Hitung dari Data</button>
+        <button id="exportPng" class="btn" title="Ekspor peta sebagai PNG">Export PNG</button>
+      </div>
+      <div id="map" aria-label="Peta persebaran kasus per provinsi"></div>
+      <div id="mapMsg" class="muted" style="margin-top:8px"></div>
+      <div class="footnote">Peta menggunakan GeoJSON provinsi dari tautan Anda (auto-load RAW GitHub). Background putih tanpa tile.</div>
+    </section>
 
+    <footer class="wrap" style="padding-bottom:48px">
+      <div class="footnote">Data disimpan di <em>localStorage</em>. Untuk sinkronisasi Google Sheets, atur <code>apps_script.gs</code> & <code>SHEETS_URL</code> di <code>script.js</code>.</div>
+    </footer>
   </main>
 
 <script src="script.js"></script>
