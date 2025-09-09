@@ -4,7 +4,8 @@
 // =====================
 const ACCESS_TOKEN = 'ZOOLEPTO123';
 const DEFAULT_GH = 'https://raw.githubusercontent.com/agustddiction/Dashboard-Leptospirosis/main/provinsi.json';
-const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbxFHgRel9-LTQTc0YIjy5G22BWk1RiqUjjDqCd8XE1Q4tF8h4t5r8X9WL-MwVZ2IyyYHg/exec';
+const SHEETS_URL = ''; // Opsional: tempel URL Web App Google Apps Script di sini (akhirnya /exec)
+
 // =====================
 // TOKEN GATE
 // =====================
@@ -27,10 +28,20 @@ function verifyToken(){
   if(val===ACCESS_TOKEN){ localStorage.setItem('lepto_token_ok','1'); afterUnlock(); } else { if(err){err.textContent='Token salah. Coba lagi.'; err.style.display='block';} }
 }
 function autoUnlockFromURL(){ try{ const t=new URLSearchParams(location.search).get('token'); if(t===ACCESS_TOKEN){ localStorage.setItem('lepto_token_ok','1'); afterUnlock(); } }catch(e){} }
-(function(){ const ok=localStorage.getItem('lepto_token_ok')==='1'; if(!ok) showLock(); else afterUnlock();
+(function(){
+  const sp = new URLSearchParams(location.search);
+  const force = sp.get('forceToken')==='1';
+  const okStored = localStorage.getItem('lepto_token_ok')==='1';
+  const ok = (!force) && okStored;
+  if(!ok) showLock(); else afterUnlock();
   document.getElementById('unlockBtn')?.addEventListener('click', verifyToken);
   document.addEventListener('keydown', e=>{ const lock=document.getElementById('lock'); if(lock && !lock.classList.contains('hidden') && e.key==='Enter') verifyToken(); });
   autoUnlockFromURL();
+  document.getElementById('forceLogin')?.addEventListener('click', ()=>{
+    try{ localStorage.removeItem('lepto_token_ok'); }catch(_){}
+    showLock();
+  });
+
 })();
 
 // =====================
