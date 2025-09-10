@@ -1,4 +1,3 @@
-
 // =====================
 // KONFIGURASI
 // =====================
@@ -86,6 +85,7 @@ function initProvKab(){
 // =====================
 // GEJALA & PAPARAN
 // =====================
+let hasInteractedGejala=false;
 function initGejalaChecklist(){
   const grid=document.getElementById('gejalaGrid');
   grid.innerHTML='';
@@ -101,13 +101,13 @@ function initGejalaChecklist(){
     grid.appendChild(wrap);
     const cb=wrap.querySelector('input[type=checkbox]');
     const dt=wrap.querySelector('input[type=date]');
-    const toggle=()=>{ dt.style.display = cb.checked ? '' : 'none'; dt.required = cb.checked; if(cb.checked && !dt.value) dt.value=today; updateOnset(); updateDefinisiBadge(); toggleManualOnset(); };
+    const toggle=()=>{ hasInteractedGejala=true; dt.style.display = cb.checked ? '' : 'none'; dt.required = cb.checked; if(cb.checked && !dt.value) dt.value=today; updateOnset(); updateDefinisiBadge(); toggleManualOnset(); };
     cb.addEventListener('change', toggle);
     dt.addEventListener('change', ()=>{ updateOnset(); updateDefinisiBadge(); });
   });
 }
 function gejalaCheckedCount(){ let c=0; GEJALA.forEach(g=>{ const cb=document.getElementById('g_'+g.id); if(cb && cb.checked) c++; }); return c; }
-function toggleManualOnset(){ const wrap=document.getElementById('manualOnsetWrap'); if(!wrap) return; const show = gejalaCheckedCount()===0; wrap.classList.toggle('hidden', !show); }
+function toggleManualOnset(){ const wrap=document.getElementById('manualOnsetWrap'); if(!wrap) return; const show = hasInteractedGejala && gejalaCheckedCount()===0; wrap.classList.toggle('hidden', !show); }
 function getManualOnsetDate(){ const el=document.getElementById('onsetManual'); if(el && el.value){ try{ return new Date(el.value);}catch(_){ return null; } } return null; }
 
 function initPaparanChecklist(){
@@ -189,6 +189,18 @@ function updateDefinisiBadge(){
   el && el.addEventListener('input', ()=>{ updateDefinisiBadge(); });
 });
 
+// ↑ tambah listener cepat untuk radio PCR/MAT/RDT
+function bindRapidRadioUpdates(){
+  ['rdt','mat','pcr'].forEach(name=>{
+    document.querySelectorAll('input[name="'+name+'"]').forEach(r=>{
+      const h=()=>{ updateDefinisiBadge(); };
+      r.addEventListener('change', h);
+      r.addEventListener('click', h);
+      r.addEventListener('input', h);
+    });
+  });
+}
+
 // =====================
 // DATA & UUID
 // =====================
@@ -250,6 +262,7 @@ function getFormData(){
   };
 }
 function resetForm(){
+  hasInteractedGejala=false;
   document.querySelectorAll('input,select,textarea').forEach(el=>{
     if(el.type==='checkbox'||el.type==='radio') el.checked=false; else el.value='';
   });
@@ -294,7 +307,7 @@ function loadCaseIntoForm(d){
   document.getElementById('tglStatus').value=d.tglStatus||'';
   document.getElementById('obat').value=d.obat||'';
 
-  updateDefinisiBadge();
+  updateDefinisiBadge(); bindRapidRadioUpdates();
   document.getElementById('simpan').textContent = 'Update Kasus';
   document.body.classList.add('editing');
   window.scrollTo({top:0, behavior:'smooth'});
@@ -576,7 +589,6 @@ document.getElementById('pullSheets')?.addEventListener('click', ()=>pullFromShe
 async function sendRowToSheets(row){
   if(!SHEETS_URL){ console.warn('SHEETS_URL kosong'); return; }
   try{
-    // Hindari kirim duplikat yang sama persis secara beruntun di sesi ini
     const arr = loadCases(); ensureUUIDs();
     const key = getKey(arr[arr.length-1] || {});
     const sent = JSON.parse(localStorage.getItem('lepto_sent_keys')||'[]');
@@ -595,7 +607,7 @@ async function sendAllToSheets(){
   ensureUUIDs();
   let arr = loadCases();
   if(!arr.length){ alert('Tidak ada data.'); return; }
-  // dedupe lokal dulu
+  // dedupe lokal pilih terbaru per key
   const localByKey = new Map();
   const toDate = s => { try{ return new Date(s); }catch(_){ return new Date(0);} };
   for(const d of arr){
@@ -609,7 +621,6 @@ async function sendAllToSheets(){
     }
   }
   let toSend = Array.from(localByKey.values());
-  // jika bisa baca Sheet, hindari kirim yang sudah ada di Sheet
   try{
     const remote = await readSheetCases();
     const remoteKeys = new Set(remote.map(getKey));
@@ -637,7 +648,6 @@ async function sendReplaceAllToSheets(){
   ensureUUIDs();
   let arr = loadCases();
   if(!arr.length){ alert('Tidak ada data lokal untuk disinkronkan.'); return; }
-  // Dedupe pilih record TERBARU per key
   const byKey = new Map();
   const toDate = s => { try{ return new Date(s); }catch(_){ return new Date(0);} };
   for(const d of arr){
@@ -687,7 +697,7 @@ _root.addEventListener('click', _autoUpd, true);
 
 function _bindHeader(){ _bindHeaderShadow(); _syncTimeModeUI(); }
 initGejalaChecklist(); initPaparanChecklist();
-updateOnset(); updateDefinisiBadge(); ensureUUIDs(); renderTable(); renderCounts(); updateCharts(); _bindHeader();
+updateOnset(); updateDefinisiBadge(); ensureUUIDs(); renderTable(); renderCounts(); updateCharts(); _bindHeader(); bindRapidRadioUpdates();
 
 // TOKEN
 (function(){
