@@ -56,17 +56,18 @@ function _bindHeaderShadow(){
 }
 function _syncTimeModeUI(){
   const mode=(document.getElementById('fTimeMode')?.value)||'month';
-  const m1=document.getElementById('monthRange'); const m2=document.getElementById('monthRange2');
-  const y1=document.getElementById('yearRange'); const y2=document.getElementById('yearRange2');
+  const mWrap=document.getElementById('monthRangeWrap');
+  const yWrap=document.getElementById('yearRangeWrap');
   if(mode==='month'){
-    m1?.classList.remove('inactive'); m2?.classList.remove('inactive');
-    y1?.classList.remove('active'); y2?.classList.remove('active');
-    y1?.classList.add('inactive'); y2?.classList.add('inactive');
+    mWrap?.classList.remove('inactive');
+    yWrap?.classList.remove('active');
+    yWrap?.classList.add('inactive');
   }else{
-    y1?.classList.add('active'); y2?.classList.add('active');
-    m1?.classList.add('inactive'); m2?.classList.add('inactive');
+    yWrap?.classList.add('active');
+    mWrap?.classList.add('inactive');
   }
 }
+document.getElementById('fTimeMode')?.addEventListener('change', _syncTimeModeUI);
 
 function initProvKab(){
   const provs=Object.keys(PROV_KAB).sort();
@@ -189,7 +190,7 @@ function updateDefinisiBadge(){
   el && el.addEventListener('input', ()=>{ updateDefinisiBadge(); });
 });
 
-// ↑ tambah listener cepat untuk radio PCR/MAT/RDT
+// ↑ listener cepat untuk radio PCR/MAT/RDT
 function bindRapidRadioUpdates(){
   ['rdt','mat','pcr'].forEach(name=>{
     document.querySelectorAll('input[name="'+name+'"]').forEach(r=>{
@@ -535,6 +536,7 @@ function flatToCase(r){
     savedAt: r['Saved At']||new Date().toISOString()
   };
 }
+function getKey(d){ return (d && d.uuid) ? ('uuid:'+d.uuid) : ('dup:'+([ (d.nama||'').trim().toLowerCase(), (d.umur||'')+'', (d.alamat||'').trim().toLowerCase(), d.onset||'' ].join('|'))); }
 function mergeCases(localArr, remoteArr){
   const byKey = new Map();
   const toDate = s => { try{ return new Date(s); }catch(_){ return new Date(0);} };
