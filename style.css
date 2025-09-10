@@ -8,8 +8,12 @@ html,body{ height:100% }
 body{ margin:0; background:var(--bg); color:var(--fg);
   font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial }
 a{ color:inherit }
-header{ position:sticky; top:0; background:rgba(255,255,255,.92); border-bottom:1px solid var(--line);
-  backdrop-filter:saturate(160%) blur(8px); z-index:5 }
+
+/* Sticky header with dynamic shadow */
+header{ position:sticky; top:0; background:rgba(255,255,255,.96); border-bottom:1px solid var(--line);
+  backdrop-filter:saturate(160%) blur(8px); z-index:20; transition: box-shadow .2s ease }
+header.scrolled{ box-shadow:0 6px 18px rgba(0,0,0,.06) }
+
 .wrap{ max-width:980px; margin:0 auto; padding:14px 18px }
 h1{ font-size:20px; margin:0 0 4px } .sub{ font-size:12px; color:var(--muted) }
 .badge{ position:absolute; right:18px; top:14px; font-size:12px;
@@ -41,18 +45,22 @@ textarea{ min-height:70px; resize:vertical }
 .symptom input[type=date]{ margin-left:auto; width:170px }
 .hidden{ display:none }
 
-/* Toolbar filters + Sheets buttons */
-.toolbar{ display:grid; grid-template-columns: 1fr auto; gap:12px; align-items:end }
-.filters-grid{ display:grid; grid-template-columns: repeat(4, minmax(160px,1fr)); gap:10px }
-.filters-grid .wide{ grid-column: span 2 }
-.filters-pair{ display:grid; grid-template-columns:1fr 1fr; gap:10px; align-items:end }
-.sheets-actions{ display:flex; gap:8px; align-items:center; justify-content:flex-end; flex-wrap:wrap }
+/* Charts grid proportional */
+.charts-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px }
+@media (max-width: 980px){ .charts-grid{ grid-template-columns:1fr } }
+.chart-card{ border:1px solid var(--line); border-radius:12px; padding:12px; background:#fff }
+.chart-card canvas{ width:100% !important; height:auto !important; aspect-ratio: 16 / 7; }
+
+/* Filters: compact & sticky */
+.sticky-filters{ position:sticky; top:64px; z-index:10; background:#fff; border:1px solid var(--line); border-radius:12px; padding:10px; }
+.filters-grid{ display:grid; grid-template-columns: repeat(6, minmax(120px,1fr)); gap:10px }
+.filters-grid .span2{ grid-column: span 2 }
 @media (max-width: 980px){
-  .filters-grid{ grid-template-columns: repeat(2, minmax(160px,1fr)); }
-  .toolbar{ grid-template-columns: 1fr }
-  .sheets-actions{ justify-content:flex-start }
-  .filters-pair{ grid-template-columns:1fr }
+  .sticky-filters{ top:56px }
+  .filters-grid{ grid-template-columns: repeat(2, minmax(140px,1fr)) }
 }
+.time-month{ display: contents } .time-year{ display: none }
+.time-year.active{ display: contents } .time-month.inactive{ display:none }
 
 /* Lock overlay */
 body.locked{ overflow:hidden }
@@ -79,29 +87,5 @@ body.locked{ overflow:hidden }
 #cancelEdit{ display:none }
 .editing #cancelEdit{ display:inline-block }
 
-/* Misc */
 .hr{ height:1px; background:var(--line); margin:10px 0 }
 .footnote{ color:var(--muted); font-size:12px; margin-top:8px }
-
-/* Sticky header with dynamic shadow */
-header{ position:sticky; top:0; background:rgba(255,255,255,.96); border-bottom:1px solid var(--line);
-  backdrop-filter:saturate(160%) blur(8px); z-index:20; transition: box-shadow .2s ease }
-header.scrolled{ box-shadow:0 6px 18px rgba(0,0,0,.06) }
-
-/* Charts grid proportional */
-.charts-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px }
-@media (max-width: 980px){ .charts-grid{ grid-template-columns:1fr } }
-.chart-card{ border:1px solid var(--line); border-radius:12px; padding:12px; background:#fff }
-.chart-card canvas{ width:100% !important; height:auto !important; aspect-ratio: 16 / 7; }
-
-/* Filters: compact & tidy */
-.sticky-filters{ position:sticky; top:64px; z-index:10; background:#fff; border:1px solid var(--line); border-radius:12px; padding:10px; }
-.filters-grid{ display:grid; grid-template-columns: repeat(6, minmax(120px,1fr)); gap:10px }
-.filters-grid .span2{ grid-column: span 2 }
-@media (max-width: 980px){
-  .sticky-filters{ top:56px }
-  .filters-grid{ grid-template-columns: repeat(2, minmax(140px,1fr)) }
-}
-/* hide/show time inputs by mode */
-.time-month{ display: contents } .time-year{ display: none }
-.time-year.active{ display: contents } .time-month.inactive{ display:none }

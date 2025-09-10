@@ -79,7 +79,7 @@
       <div id="manualOnsetWrap" class="row hidden" style="margin-top:8px">
         <div style="min-width:260px">
           <label>Tanggal gejala (manual)</label>
-          <input id="onsetManual" type="date" max="2025-09-09" />
+          <input id="onsetManual" type="date" max="2025-09-10" />
           <div class="muted">Gunakan ini hanya jika <b>tidak ada gejala yang dicentang</b>.</div>
         </div>
       </div>
@@ -238,37 +238,39 @@
                 <option value="year">Tahun</option>
               </select>
             </div>
-            <div>
+            <div class="time-month" id="monthRange">
               <label>Dari Bulan</label>
               <input id="fStart" type="month"/>
             </div>
-            <div>
+            <div class="time-month" id="monthRange2">
               <label>Sampai Bulan</label>
               <input id="fEnd" type="month"/>
             </div>
-            <div>
+            <div class="time-year" id="yearRange">
               <label>Dari Tahun</label>
               <input id="fYearStart" type="number" min="2000" max="2100" placeholder="mis. 2023"/>
             </div>
-            <div>
+            <div class="time-year" id="yearRange2">
               <label>Sampai Tahun</label>
               <input id="fYearEnd" type="number" min="2000" max="2100" placeholder="mis. 2025"/>
             </div>
-            <div class="filters-pair">
-              <div>
-                <label>Filter Provinsi</label>
-                <select id="fProv"></select>
-              </div>
-              <div>
-                <label>Filter Kabupaten/Kota</label>
-                <select id="fKab"></select>
+            <div class="span2">
+              <div class="grid-2">
+                <div>
+                  <label>Filter Provinsi</label>
+                  <select id="fProv"></select>
+                </div>
+                <div>
+                  <label>Filter Kabupaten/Kota</label>
+                  <select id="fKab"></select>
+                </div>
               </div>
             </div>
             <div style="align-self:flex-end">
               <button class="btn" id="applyFilter">Terapkan</button>
             </div>
           </div>
-          </div>
+        </div>
       </div>
 
       <div style="overflow:auto; margin-top:10px">
@@ -299,8 +301,7 @@
     </section>
 
     <section id="peta">
-      <h2 aria-label="Judul peta">Sebaran Jumlah Kasus Leto
-      psirosis per Provinsi, Indonesia</h2>
+      <h2 aria-label="Judul peta">Sebaran Jumlah Kasus Leptospirosis per Provinsi, Indonesia</h2>
       <div class="sub" style="margin-top:-6px">Contoh data — ganti dengan data aktual</div>
       <div class="row" style="margin-top:12px">
         <button id="recalcMap" class="btn" title="Hitung peta berdasarkan data tersimpan">Hitung dari Data</button>
@@ -316,6 +317,7 @@
       <div class="row">
         <button class="btn" id="pullSheets">Tarik dari Google Sheet</button>
         <button class="btn" id="syncSheets">Kirim ke Google Sheet</button>
+        <button class="btn" id="fullSyncSheets" title="Ganti seluruh isi sheet dengan data unik terbaru dari aplikasi ini">Full Sync (Replace All)</button>
         <span id="pullStatus" class="muted" style="align-self:center"></span>
       </div>
       <div class="footnote">Pastikan Anda sudah mengisi <code>SHEETS_URL</code>, <code>SPREADSHEET_ID</code>, dan melakukan <em>Publish to web</em> pada sheet.</div>

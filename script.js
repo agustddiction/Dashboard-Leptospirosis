@@ -5,18 +5,16 @@
 const ACCESS_TOKEN = 'ZOOLEPTO123';
 const DEFAULT_GH = 'https://raw.githubusercontent.com/agustddiction/Dashboard-Leptospirosis/main/provinsi.json';
 // Google Sheets WRITE (Apps Script /exec)
-const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbxFHgRel9-LTQTc0YIjy5G22BWk1RiqUjjDqCd8XE1Q4tF8h4t5r8X9WL-MwVZ2IyyYHg/exec'; // <-- tempel URL Web App /exec di sini
-// Google Sheets READ (GViz JSON). Isi SPREADSHEET_ID dan SHEET_NAME lalu publish sheet ke web
-const SPREADSHEET_ID = '1rcySn3UNzsEHCd7t7ld4f-pSBUTrbNDBDgvxjbLcRm4';
+const SHEETS_URL = ''; // isi URL Web App /exec
+// Google Sheets READ (GViz JSON)
+const SPREADSHEET_ID = 'GANTI_DENGAN_ID_SHEET_ANDA';
 const SHEET_NAME = 'Kasus';
 const SHEETS_READ_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json`;
-
-// Auto tarik data
 const AUTO_PULL = true;
 const AUTO_PULL_INTERVAL_MS = 5*60*1000;
 
 // =====================
-// MASTER DATA
+// MASTER DATA & UI INIT
 // =====================
 let PROV_KAB={};
 fetch('./data/kabkota.json').then(r=>r.json()).then(j=>{ PROV_KAB=j; initProvKab(); }).catch(()=>{ PROV_KAB={"Aceh":["Kabupaten Aceh Besar"]}; initProvKab(); });
@@ -47,14 +45,29 @@ const PAPARAN=[
   "Hobi/olahraga/wisata (berenang, memancing, arung jeram, dll.)",
 ];
 
-// =====================
-// FORM DROPDOWNS
-// =====================
 const prov=document.getElementById('prov'); const kab=document.getElementById('kab');
 const fProv=document.getElementById('fProv'); const fKab=document.getElementById('fKab');
 const fStart=document.getElementById('fStart'); const fEnd=document.getElementById('fEnd');
 const fTimeMode=document.getElementById('fTimeMode'); const fYearStart=document.getElementById('fYearStart'); const fYearEnd=document.getElementById('fYearEnd');
-const trendTitle=document.getElementById('trendTitle');
+
+function _bindHeaderShadow(){
+  const h=document.querySelector('header'); if(!h) return;
+  const onscroll=()=>{ if(window.scrollY>4) h.classList.add('scrolled'); else h.classList.remove('scrolled'); };
+  window.addEventListener('scroll', onscroll, {passive:true}); onscroll();
+}
+function _syncTimeModeUI(){
+  const mode=(document.getElementById('fTimeMode')?.value)||'month';
+  const m1=document.getElementById('monthRange'); const m2=document.getElementById('monthRange2');
+  const y1=document.getElementById('yearRange'); const y2=document.getElementById('yearRange2');
+  if(mode==='month'){
+    m1?.classList.remove('inactive'); m2?.classList.remove('inactive');
+    y1?.classList.remove('active'); y2?.classList.remove('active');
+    y1?.classList.add('inactive'); y2?.classList.add('inactive');
+  }else{
+    y1?.classList.add('active'); y2?.classList.add('active');
+    m1?.classList.add('inactive'); m2?.classList.add('inactive');
+  }
+}
 
 function initProvKab(){
   const provs=Object.keys(PROV_KAB).sort();
@@ -71,7 +84,7 @@ function initProvKab(){
 }
 
 // =====================
-// GEJALA CHECKLIST
+// GEJALA & PAPARAN
 // =====================
 function initGejalaChecklist(){
   const grid=document.getElementById('gejalaGrid');
@@ -93,15 +106,10 @@ function initGejalaChecklist(){
     dt.addEventListener('change', ()=>{ updateOnset(); updateDefinisiBadge(); });
   });
 }
-function gejalaCheckedCount(){
-  let c=0; GEJALA.forEach(g=>{ const cb=document.getElementById('g_'+g.id); if(cb && cb.checked) c++; }); return c;
-}
+function gejalaCheckedCount(){ let c=0; GEJALA.forEach(g=>{ const cb=document.getElementById('g_'+g.id); if(cb && cb.checked) c++; }); return c; }
 function toggleManualOnset(){ const wrap=document.getElementById('manualOnsetWrap'); if(!wrap) return; const show = gejalaCheckedCount()===0; wrap.classList.toggle('hidden', !show); }
 function getManualOnsetDate(){ const el=document.getElementById('onsetManual'); if(el && el.value){ try{ return new Date(el.value);}catch(_){ return null; } } return null; }
 
-// =====================
-// PAPARAN
-// =====================
 function initPaparanChecklist(){
   const grid=document.getElementById('paparanGrid'); grid.innerHTML='';
   PAPARAN.forEach((p,idx)=>{
@@ -114,7 +122,7 @@ function initPaparanChecklist(){
 }
 
 // =====================
-// ONSET & DEFINISI KASUS
+// ONSET & DEFINISI
 // =====================
 function getOnsetDate(){
   let earliest=null;
@@ -132,8 +140,8 @@ function getOnsetDate(){
   return earliest;
 }
 function updateOnset(){ const onset=getOnsetDate(); document.getElementById('onsetTag').textContent = onset ? onset.toISOString().slice(0,10) : "—"; }
-
 function getRadio(name){ return (document.querySelector('input[name="'+name+'"]:checked')?.value)||''; }
+
 function computeDefinisi(){
   const S={}; GEJALA.forEach(g=>{ S[g.id]=document.getElementById('g_'+g.id)?.checked; });
   const anyExposure = PAPARAN.some((_,idx)=> document.getElementById('p_'+idx)?.checked );
@@ -176,28 +184,13 @@ function updateDefinisiBadge(){
   else if(def==='Suspek') badge.classList.add('neutral');
   else badge.classList.add('bad');
 }
-// Tandai abnormal saat ketik
 ['leukosit','trombosit','bilirubin','sgot','sgpt','kreatinin','amilase','cpk'].forEach(id=>{
   const el=document.getElementById(id);
-  el && el.addEventListener('input', ()=>{
-    const v=parseFloat(el.value); let abn=false;
-    switch(id){
-      case 'leukosit': abn=!isNaN(v)&&(v<3.5||v>10.5); break;
-      case 'trombosit': abn=!isNaN(v)&&(v<150||v>450); break;
-      case 'bilirubin': abn=!isNaN(v)&&(v>1.2); break;
-      case 'sgot': abn=!isNaN(v)&&(v>40); break;
-      case 'sgpt': abn=!isNaN(v)&&(v>41); break;
-      case 'kreatinin': abn=!isNaN(v)&&(v<0.6||v>1.3); break;
-      case 'amilase': abn=!isNaN(v)&&(v>110); break;
-      case 'cpk': abn=!isNaN(v)&&(v>200); break;
-    }
-    el.classList.toggle('abn', abn);
-    updateDefinisiBadge();
-  });
+  el && el.addEventListener('input', ()=>{ updateDefinisiBadge(); });
 });
 
 // =====================
-// CRUD DATA + UUID
+// DATA & UUID
 // =====================
 function genUUID(){
   try{ if (crypto && crypto.randomUUID) return crypto.randomUUID(); }catch(_){}
@@ -206,9 +199,9 @@ function genUUID(){
   });
 }
 let editingIndex=-1; let editingUUID=null;
-
 function norm(s){ return (s||"").toString().trim().toLowerCase().replace(/\s+/g,' '); }
 function duplicateKey(d){ return [norm(d.nama),norm(d.umur),norm(d.alamat),d.onset||''].join('|'); }
+function getKey(d){ return (d && d.uuid) ? ('uuid:'+d.uuid) : ('dup:'+duplicateKey(d)); }
 
 function loadCases(){ try{return JSON.parse(localStorage.getItem('lepto_cases')||'[]');}catch(e){return[]} }
 function saveCases(arr){ localStorage.setItem('lepto_cases', JSON.stringify(arr)); }
@@ -306,12 +299,7 @@ function loadCaseIntoForm(d){
   document.body.classList.add('editing');
   window.scrollTo({top:0, behavior:'smooth'});
 }
-function cancelEdit(){
-  editingIndex = -1; editingUUID=null;
-  document.getElementById('simpan').textContent = 'Simpan Kasus';
-  document.body.classList.remove('editing');
-  resetForm();
-}
+function cancelEdit(){ editingIndex=-1; editingUUID=null; document.getElementById('simpan').textContent='Simpan Kasus'; document.body.classList.remove('editing'); resetForm(); }
 document.getElementById('cancelEdit').addEventListener('click', (e)=>{ e.preventDefault(); cancelEdit(); });
 
 function renderCounts(){
@@ -341,7 +329,6 @@ function renderTable(){
   });
 }
 
-// Save
 document.getElementById('simpan').addEventListener('click', e=>{
   e.preventDefault();
   const data=getFormData();
@@ -353,13 +340,13 @@ document.getElementById('simpan').addEventListener('click', e=>{
   alert('Kasus disimpan.');
 });
 
-// Duplicates
 document.getElementById('cekDup').addEventListener('click', ()=>{
   const arr=loadCases(); const seen={}; const dups=new Set();
   arr.forEach((d,i)=>{ const k=duplicateKey(d); if(seen[k]!==undefined){ dups.add(i); dups.add(seen[k]); } else { seen[k]=i; } });
   const rows=document.querySelectorAll('#casesTable tbody tr');
   rows.forEach((tr,i)=>tr.style.backgroundColor = dups.has(i) ? '#fff7e6' : '');
-  alert(dups.size ? 'Duplikat ditemukan & ditandai krem.' : 'Tidak ada duplikat.');
+  alert(duplikatMsg(dups.size));
+  function duplikatMsg(n){ return n ? 'Duplikat ditemukan & ditandai krem.' : 'Tidak ada duplikat.'; }
 });
 document.getElementById('hapusDup').addEventListener('click', ()=>{
   const arr=loadCases(); const seen={}; const result=[];
@@ -370,7 +357,7 @@ document.getElementById('hapusDup').addEventListener('click', ()=>{
 });
 
 // =====================
-// CHARTS & FILTERS
+// CHARTS
 // =====================
 let trendChart, kabChart;
 function ensureCharts(){
@@ -397,30 +384,15 @@ function updateCharts(){
     const ds=getDateForAgg(d);
     return (mode==='month') ? withinRangeMonth(ds,ms,me) : withinRangeYear(ds,ys,ye);
   });
-  // Trend
-  const agg={};
-  filtered.forEach(d=>{
-    const ds=getDateForAgg(d); const key=(mode==='month')? monthKey(ds) : yearKey(ds);
-    if(!key) return; agg[key]=(agg[key]||0)+1;
-  });
-  const keys=Object.keys(agg).sort();
-  trendChart.data.labels=keys;
-  trendChart.data.datasets[0].data=keys.map(k=>agg[k]||0);
-  trendChart.update();
-  trendTitle.textContent = (mode==='month') ? 'Tren kasus per bulan' : 'Tren kasus per tahun';
-
-  // Per kab/kota
-  const perKab={};
-  filtered.forEach(d=>{ const kk=d.kab||'(Tidak diisi)'; perKab[kk]=(perKab[kk]||0)+1; });
-  const kLabels=Object.keys(perKab).sort();
-  kabChart.data.labels=kLabels;
-  kabChart.data.datasets[0].data=kLabels.map(k=>perKab[k]||0);
-  kabChart.update();
+  const agg={}; filtered.forEach(d=>{ const ds=getDateForAgg(d); const key=(mode==='month')? monthKey(ds) : yearKey(ds); if(!key) return; agg[key]=(agg[key]||0)+1; });
+  const keys=Object.keys(agg).sort(); trendChart.data.labels=keys; trendChart.data.datasets[0].data=keys.map(k=>agg[k]||0); trendChart.update();
+  const perKab={}; filtered.forEach(d=>{ const kk=d.kab||'(Tidak diisi)'; perKab[kk]=(perKab[kk]||0)+1; });
+  const kLabels=Object.keys(perKab).sort(); kabChart.data.labels=kLabels; kabChart.data.datasets[0].data=kLabels.map(k=>perKab[k]||0); kabChart.update();
 }
 document.getElementById('applyFilter').addEventListener('click', updateCharts);
 
 // =====================
-// PETA CHOROPLETH
+// PETA
 // =====================
 function getColor(val){ const v=Number(val)||0; if(v===0) return '#ffffff'; if(v>0&&v<=50) return '#ffc4c4'; if(v>50&&v<=200) return '#ff7a7a'; return '#cc0000'; }
 let geojsonLayer; let _labels=[]; window._leaf_map = null;
@@ -501,7 +473,7 @@ function exportToExcel(){ const arr=loadCases(); if(arr.length===0){ alert('Tida
 document.getElementById('exportExcel').addEventListener('click', exportToExcel);
 
 // =====================
-// GOOGLE SHEETS
+// GOOGLE SHEETS (anti duplikat + full sync)
 // =====================
 function setPullStatus(msg){ const el=document.getElementById('pullStatus'); if(el) el.textContent=msg||''; }
 function parseGVizJSON(text){
@@ -553,10 +525,7 @@ function flatToCase(r){
 function mergeCases(localArr, remoteArr){
   const byKey = new Map();
   const toDate = s => { try{ return new Date(s); }catch(_){ return new Date(0);} };
-  const getKey = d => (d && d.uuid) ? ('uuid:'+d.uuid) : ('dup:'+duplicateKey(d));
-
   localArr.forEach(d=>{ byKey.set(getKey(d), d); });
-
   remoteArr.forEach(r=>{
     const k = getKey(r);
     if(!byKey.has(k)){ byKey.set(k, r); }
@@ -570,16 +539,21 @@ function mergeCases(localArr, remoteArr){
   return Array.from(byKey.values());
 }
 
+async function readSheetCases(){
+  if(!SPREADSHEET_ID || SPREADSHEET_ID.startsWith('GANTI_')) throw new Error('SPREADSHEET_ID belum diisi');
+  const res = await fetch(SHEETS_READ_URL, { mode:'cors', cache:'no-store' });
+  const text = await res.text();
+  const flat = parseGVizJSON(text);
+  return flat.map(flatToCase);
+}
+
 async function pullFromSheets(opts={merge:true, silent:false}){
   if(!SPREADSHEET_ID || SPREADSHEET_ID.startsWith('GANTI_')){
     if(!opts.silent) alert('SPREADSHEET_ID belum diisi di script.js');
     return;
   }
   try{
-    const res = await fetch(SHEETS_READ_URL, { mode:'cors', cache:'no-store' });
-    const text = await res.text();
-    const flat = parseGVizJSON(text);
-    const remoteCases = flat.map(flatToCase);
+    const remoteCases = await readSheetCases();
     if(opts.merge){
       const local = loadCases();
       const merged = mergeCases(local, remoteCases);
@@ -594,7 +568,7 @@ async function pullFromSheets(opts={merge:true, silent:false}){
   }catch(e){
     console.error('pullFromSheets error', e);
     setPullStatus('Gagal tarik otomatis (cek publish Sheet & ID)');
-    if(!opts.silent) alert('Gagal menarik data dari Google Sheet. Pastikan Sheet di-publish ke web (File → Share → Publish to web).');
+    if(!opts.silent) alert('Gagal menarik data dari Google Sheet. Pastikan Sheet di-publish ke web.');
   }
 }
 document.getElementById('pullSheets')?.addEventListener('click', ()=>pullFromSheets({merge:true, silent:false}));
@@ -602,26 +576,95 @@ document.getElementById('pullSheets')?.addEventListener('click', ()=>pullFromShe
 async function sendRowToSheets(row){
   if(!SHEETS_URL){ console.warn('SHEETS_URL kosong'); return; }
   try{
+    // Hindari kirim duplikat yang sama persis secara beruntun di sesi ini
+    const arr = loadCases(); ensureUUIDs();
+    const key = getKey(arr[arr.length-1] || {});
+    const sent = JSON.parse(localStorage.getItem('lepto_sent_keys')||'[]');
+    if(sent.includes(key)){ console.log('Lewati kirim: baris sudah pernah dikirim'); return; }
     await fetch(SHEETS_URL, {
       method: 'POST', mode: 'no-cors',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ token: ACCESS_TOKEN, action: 'append', row })
     });
+    sent.push(key); localStorage.setItem('lepto_sent_keys', JSON.stringify(sent));
   }catch(e){ console.warn('Gagal kirim Sheets:', e); }
 }
+
 async function sendAllToSheets(){
   if(!SHEETS_URL){ alert('SHEETS_URL belum diisi.'); return; }
-  const arr=loadCases(); if(!arr.length){ alert('Tidak ada data.'); return; }
+  ensureUUIDs();
+  let arr = loadCases();
+  if(!arr.length){ alert('Tidak ada data.'); return; }
+  // dedupe lokal dulu
+  const localByKey = new Map();
+  const toDate = s => { try{ return new Date(s); }catch(_){ return new Date(0);} };
+  for(const d of arr){
+    const k=getKey(d);
+    if(!localByKey.has(k)) localByKey.set(k, d);
+    else {
+      const a=localByKey.get(k);
+      const tA=toDate(a.savedAt||a.tglStatus||a.onset||'1970-01-01');
+      const tB=toDate(d.savedAt||d.tglStatus||d.onset||'1970-01-01');
+      if(tB>tA) localByKey.set(k, d);
+    }
+  }
+  let toSend = Array.from(localByKey.values());
+  // jika bisa baca Sheet, hindari kirim yang sudah ada di Sheet
+  try{
+    const remote = await readSheetCases();
+    const remoteKeys = new Set(remote.map(getKey));
+    toSend = toSend.filter(d => !remoteKeys.has(getKey(d)));
+  }catch(e){
+    console.warn('Lewati cek duplikat dari Sheet (GViz tidak tersedia):', e);
+  }
+  if(toSend.length === 0){
+    alert('Tidak ada baris baru untuk dikirim (semua sudah ada di Sheet).');
+    return;
+  }
   try{
     await fetch(SHEETS_URL, {
       method: 'POST', mode: 'no-cors',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ token: ACCESS_TOKEN, action: 'appendBatch', rows: arr.map(flattenCase) })
+      body: JSON.stringify({ token: ACCESS_TOKEN, action: 'appendBatch', rows: toSend.map(flattenCase) })
     });
-    alert('Permintaan sync dikirim (no-cors). Cek Sheet Anda.');
+    alert('Permintaan sync dikirim: '+toSend.length+' baris baru.');
   }catch(e){ alert('Gagal sync: '+e); }
 }
 document.getElementById('syncSheets')?.addEventListener('click', sendAllToSheets);
+
+async function sendReplaceAllToSheets(){
+  if(!SHEETS_URL){ alert('SHEETS_URL belum diisi.'); return; }
+  ensureUUIDs();
+  let arr = loadCases();
+  if(!arr.length){ alert('Tidak ada data lokal untuk disinkronkan.'); return; }
+  // Dedupe pilih record TERBARU per key
+  const byKey = new Map();
+  const toDate = s => { try{ return new Date(s); }catch(_){ return new Date(0);} };
+  for(const d of arr){
+    const k = getKey(d);
+    if(!byKey.has(k)){ byKey.set(k, d); }
+    else {
+      const a = byKey.get(k);
+      const tA = toDate(a.savedAt||a.tglStatus||a.onset||'1970-01-01');
+      const tB = toDate(d.savedAt||d.tglStatus||d.onset||'1970-01-01');
+      if(tB > tA) byKey.set(k, d);
+    }
+  }
+  const uniqueLatest = Array.from(byKey.values());
+  const ok = confirm('PERINGATAN: Tindakan ini akan MENGGANTI seluruh isi sheet dengan '+uniqueLatest.length+' baris dari aplikasi ini.\nLanjutkan?');
+  if(!ok) return;
+  try{
+    await fetch(SHEETS_URL, {
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ token: ACCESS_TOKEN, action: 'replaceAll', rows: uniqueLatest.map(flattenCase) })
+    });
+    alert('Permintaan Full Sync (Replace All) dikirim. Periksa Google Sheet Anda.');
+  }catch(e){
+    alert('Gagal Full Sync: '+e);
+  }
+}
+document.getElementById('fullSyncSheets')?.addEventListener('click', sendReplaceAllToSheets);
 
 // Jadwal auto-pull setelah login
 let _autoTimer = null;
@@ -633,7 +676,7 @@ async function scheduleAutoPull(){
 }
 
 // =====================
-// AUTO UPDATE & STARTUP
+// AUTO UPDATE & STARTUP + TOKEN CORE
 // =====================
 const _root=document.querySelector('main');
 function _autoUpd(){ updateOnset(); updateDefinisiBadge(); toggleManualOnset(); }
@@ -642,10 +685,11 @@ _root.addEventListener('change', _autoUpd, true);
 _root.addEventListener('keyup', _autoUpd, true);
 _root.addEventListener('click', _autoUpd, true);
 
+function _bindHeader(){ _bindHeaderShadow(); _syncTimeModeUI(); }
 initGejalaChecklist(); initPaparanChecklist();
-updateOnset(); updateDefinisiBadge(); ensureUUIDs(); renderTable(); renderCounts(); updateCharts(); _bindHeaderShadow(); _syncTimeModeUI();
+updateOnset(); updateDefinisiBadge(); ensureUUIDs(); renderTable(); renderCounts(); updateCharts(); _bindHeader();
 
-// ============= TOKEN CORE (HARDENED) =============
+// TOKEN
 (function(){
   const OK_KEY = 'lepto_token_ok';
   let unlocked=false;
@@ -698,25 +742,3 @@ updateOnset(); updateDefinisiBadge(); ensureUUIDs(); renderTable(); renderCounts
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', start); else start();
   window.__leptoToken={ verifyToken, showLock, afterUnlock };
 })();
-
-// Header shadow on scroll
-function _bindHeaderShadow(){
-  const h=document.querySelector('header'); if(!h) return;
-  const onscroll=()=>{ if(window.scrollY>4) h.classList.add('scrolled'); else h.classList.remove('scrolled'); };
-  window.addEventListener('scroll', onscroll, {passive:true}); onscroll();
-}
-
-function _syncTimeModeUI(){
-  const mode=(document.getElementById('fTimeMode')?.value)||'month';
-  const m1=document.getElementById('monthRange'); const m2=document.getElementById('monthRange2');
-  const y1=document.getElementById('yearRange'); const y2=document.getElementById('yearRange2');
-  if(mode==='month'){
-    m1?.classList.remove('inactive'); m2?.classList.remove('inactive');
-    y1?.classList.remove('active'); y2?.classList.remove('active');
-    y1?.classList.add('inactive'); y2?.classList.add('inactive');
-  }else{
-    y1?.classList.add('active'); y2?.classList.add('active');
-    m1?.classList.add('inactive'); m2?.classList.add('inactive');
-  }
-}
-document.getElementById('fTimeMode')?.addEventListener('change', ()=>{ _syncTimeModeUI(); updateCharts(); });
