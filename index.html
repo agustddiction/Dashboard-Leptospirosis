@@ -231,6 +231,7 @@
       <div class="sticky-filters">
         <div class="toolbar">
           <div class="filters-grid">
+            <!-- Mode Waktu -->
             <div>
               <label>Mode Waktu</label>
               <select id="fTimeMode">
@@ -238,22 +239,28 @@
                 <option value="year">Tahun</option>
               </select>
             </div>
-            <div class="time-month" id="monthRange">
-              <label>Dari Bulan</label>
-              <input id="fStart" type="month"/>
+
+            <!-- Rentang Bulan (inline) -->
+            <div class="span2 time-month" id="monthRangeWrap">
+              <label>Rentang Bulan</label>
+              <div class="range-inline">
+                <input id="fStart" type="month"/>
+                <span class="sep">–</span>
+                <input id="fEnd" type="month"/>
+              </div>
             </div>
-            <div class="time-month" id="monthRange2">
-              <label>Sampai Bulan</label>
-              <input id="fEnd" type="month"/>
+
+            <!-- Rentang Tahun (inline) -->
+            <div class="span2 time-year" id="yearRangeWrap">
+              <label>Rentang Tahun</label>
+              <div class="range-inline">
+                <input id="fYearStart" type="number" min="2000" max="2100" placeholder="mis. 2023"/>
+                <span class="sep">–</span>
+                <input id="fYearEnd" type="number" min="2000" max="2100" placeholder="mis. 2025"/>
+              </div>
             </div>
-            <div class="time-year" id="yearRange">
-              <label>Dari Tahun</label>
-              <input id="fYearStart" type="number" min="2000" max="2100" placeholder="mis. 2023"/>
-            </div>
-            <div class="time-year" id="yearRange2">
-              <label>Sampai Tahun</label>
-              <input id="fYearEnd" type="number" min="2000" max="2100" placeholder="mis. 2025"/>
-            </div>
+
+            <!-- Prov/Kab di satu baris -->
             <div class="span2">
               <div class="grid-2">
                 <div>
@@ -266,7 +273,9 @@
                 </div>
               </div>
             </div>
-            <div style="align-self:flex-end">
+
+            <!-- Tombol apply di ujung kanan -->
+            <div class="actions">
               <button class="btn" id="applyFilter">Terapkan</button>
             </div>
           </div>
