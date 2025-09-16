@@ -764,21 +764,30 @@ updateOnset(); updateDefinisiBadge(); ensureUUIDs(); dedupeLocalInPlace(); rende
 // TOKEN
 (function(){
   const OK_KEY = 'lepto_token_ok';
-  let unlocked=false;
-  function hideLock(){ const el=document.getElementById('lock'); if(el){ el.remove(); document.body.classList.remove('locked'); } }
+  let unlocked = false;
+
+  function hideLock(){
+    const el = document.getElementById('lock');
+    if(el){
+      el.remove();
+      document.body.classList.remove('locked');
+    }
+  }
+
   function showLock(){
-    const el=document.getElementById('lock');
+    const el = document.getElementById('lock');
     if(!el) return;
     el.classList.remove('hidden');
     document.body.classList.add('locked');
     bindHandlers();
     setTimeout(()=>document.getElementById('tokenInput')?.focus(), 50);
   }
+
   function bindHandlers(){
-    const btn=document.getElementById('unlockBtn');
-    const form=document.getElementById('lockForm');
-    const input=document.getElementById('tokenInput');
-    const err=document.getElementById('lockErr');
+    const btn   = document.getElementById('unlockBtn');
+    const form  = document.getElementById('lockForm');
+    const input = document.getElementById('tokenInput');
+    const err   = document.getElementById('lockErr');
     if(err) err.style.display='none';
     if(input){
       try{
@@ -786,18 +795,15 @@ updateOnset(); updateDefinisiBadge(); ensureUUIDs(); dedupeLocalInPlace(); rende
         if(saved) input.value = saved;
       }catch(_){}
     }
-    if(btn) btn.addEventListener('click', e=>{ e.preventDefault(); verifyToken(); });
-    if(form) form.addEventListener('submit', e=>{ e.preventDefault(); verifyToken(); });
-  });
-    if(form) form.addEventListener('submit', e=>{ e.preventDefault(); verifyToken(); });
-    if(input) input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); verifyToken(); } });
+    if(btn)  btn.addEventListener('click',  e=>{ e.preventDefault(); verifyToken(); });
+    if(form) form.addEventListener('submit',e=>{ e.preventDefault(); verifyToken(); });
   }
+
   async function afterUnlock(){
-    if(unlocked) return; unlocked=true;
+    if(unlocked) return;
+    unlocked = true;
     hideLock();
-    try{
-      await firstSync(); // ensure no duplicates both locally and from Sheet before first render
-    }catch(_){}
+    try{ await firstSync(); }catch(_){}
     try{ renderTable(); renderCounts(); updateCharts(); }catch(_){}
     try{ recalcCasesFromLocalAndRefresh(); }catch(_){}
     setTimeout(()=>{
@@ -806,15 +812,8 @@ updateOnset(); updateDefinisiBadge(); ensureUUIDs(); dedupeLocalInPlace(); rende
       setTimeout(()=>{ if(window._leaf_map){ try{ window._leaf_map.invalidateSize(); fitIndonesia(); }catch(_){} } },200);
       try{ scheduleAutoPull(); }catch(_){}
     },100);
-  }catch(_){}
-    try{ recalcCasesFromLocalAndRefresh(); }catch(_){}
-    setTimeout(()=>{
-      try{ initMap(); }catch(_){}
-      try{ trendChart?.resize(); kabChart?.resize(); }catch(_){}
-      setTimeout(()=>{ if(window._leaf_map){ try{ window._leaf_map.invalidateSize(); fitIndonesia(); }catch(_){}} },200);
-      try{ scheduleAutoPull(); }catch(_){}
-    },100);
   }
+
   function verifyToken(){
     const inputEl = document.getElementById('tokenInput');
     const val = (inputEl?.value||'').trim();
@@ -824,31 +823,34 @@ updateOnset(); updateDefinisiBadge(); ensureUUIDs(); dedupeLocalInPlace(); rende
       inputEl?.focus();
       return;
     }
-    // Simpan & buka
     setActiveToken(val);
     try{ localStorage.setItem(OK_KEY,'1'); }catch(_){}
     afterUnlock();
-  }catch(_){ } afterUnlock(); }
-    else { if(err){ err.textContent='Token salah. Coba lagi.'; err.style.display='block'; } }
   }
+
   function autoUnlockFromURL(){
     try{
-      const sp=new URLSearchParams(location.search);
+      const sp = new URLSearchParams(location.search);
       const urlTok = sp.get('token');
-      const skip= sp.get('skipToken')==='1';
-      if(skip){ try{ localStorage.setItem(OK_KEY,'1'); }catch(_){ } afterUnlock(); return true; }
+      const skip   = sp.get('skipToken') === '1';
+      if(skip){
+        try{ localStorage.setItem(OK_KEY,'1'); }catch(_){}
+        afterUnlock();
+        return true;
+      }
       if(urlTok && urlTok.trim().length>0){
         setActiveToken(urlTok.trim());
-        try{ localStorage.setItem(OK_KEY,'1'); }catch(_){ }
-        afterUnlock(); 
+        try{ localStorage.setItem(OK_KEY,'1'); }catch(_){}
+        afterUnlock();
         return true;
       }
     }catch(_){}
     return false;
   }
+
   function autoUnlockFromSaved(){
     try{
-      const ok = localStorage.getItem(OK_KEY)==='1';
+      const ok = localStorage.getItem(OK_KEY) === '1';
       const saved = (localStorage.getItem(TOKEN_LS_KEY)||'').trim();
       if(ok && saved){
         afterUnlock();
@@ -857,17 +859,18 @@ updateOnset(); updateDefinisiBadge(); ensureUUIDs(); dedupeLocalInPlace(); rende
     }catch(_){}
     return false;
   }
-  
-    try{
-      const sp=new URLSearchParams(location.search);
-      const t=sp.get('token'); const skip=sp.get('skipToken')==='1';
-      if(skip || t===ACCESS_TOKEN){ try{ localStorage.setItem(OK_KEY,'1'); }catch(_){ } afterUnlock(); return true; }
-    }catch(_){}
-    return false;
+
+  function start(){
+    if(autoUnlockFromURL()) return;
+    if(autoUnlockFromSaved()) return;
+    showLock();
   }
-  function start(){ if(autoUnlockFromURL()) return; if(autoUnlockFromSaved()) return; showLock(); }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', start); else start();
-  window.__leptoToken={ verifyToken, showLock, afterUnlock };
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+
+  // expose for debugging
+  window.__leptoToken = { verifyToken, showLock, afterUnlock };
 })();
 
 
@@ -878,19 +881,3 @@ document.getElementById('reset')?.addEventListener('click', (e)=>{
 });
 
 
-// Change token button handler (outside IIFE)
-(function(){
-  const btn = document.getElementById('changeToken');
-  if(btn){
-    btn.addEventListener('click', (e)=>{
-      e.preventDefault();
-      try{ localStorage.removeItem('lepto_ok'); }catch(_){}
-      try{ localStorage.removeItem('lepto_token'); }catch(_){}
-      if(window.__leptoToken && typeof window.__leptoToken.showLock==='function'){
-        window.__leptoToken.showLock();
-      } else {
-        alert('Form token tidak tersedia.');
-      }
-    });
-  }
-})();
