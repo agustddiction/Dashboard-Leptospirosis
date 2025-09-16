@@ -54,24 +54,26 @@ function _bindHeaderShadow(){
   const onscroll=()=>{ if(window.scrollY>4) h.classList.add('scrolled'); else h.classList.remove('scrolled'); };
   window.addEventListener('scroll', onscroll, {passive:true}); onscroll();
 }
-function _syncTimeModeUI(){
-  const mode=(document.getElementById('fTimeMode'(())&&().value)))||'month';
-  const mWrap=document.getElementById('monthRangeWrap');
-  const yWrap=document.getElementById('yearRangeWrap');
-  if(mode==='month'){
-    ((mWrap)&&(mWrap.classList)).remove('inactive');
-    ((yWrap)&&(yWrap.classList)).remove('active');
-    ((yWrap)&&(yWrap.classList)).add('inactive');
-  }else{
-    ((yWrap)&&(yWrap.classList)).add('active');
-    ((mWrap)&&(mWrap.classList)).add('inactive');
+
+function _syncTimeModeUI() {
+  const mode = (document.getElementById('fTimeMode')?.value) || 'month';
+  const mWrap = document.getElementById('monthRangeWrap');
+  const yWrap = document.getElementById('yearRangeWrap');
+  if (mode === 'month') {
+    mWrap?.classList.remove('inactive');
+    yWrap?.classList.add('inactive');
+  } else {
+    yWrap?.classList.remove('inactive');
+    mWrap?.classList.add('inactive');
   }
 }
+document.getElementById('fTimeMode')?.addEventListener('change', _syncTimeModeUI);
+
 document.getElementById('fTimeMode'(())&&().addEventListener))('change', _syncTimeModeUI);
 
 function initProvKab(){
   const provs=Object.keys(PROV_KAB).sort();
-  const addOpts=(sel,items,withAll=false)=>{ sel.innerHTML=""; if(withAll) sel.append(new Option("Semua","")); sel.append(new Option("Pilih...","")); items.forEach(x=>sel.append(new Option(x,x))); };
+  const addOpts=(sel,items,withAll=false)=>{ sel.innerHTML=""; if(withAll) sel.append(new Option("Semua","")); sel.append(new Option("Pilih","")); items.forEach(x=>sel.append(new Option(x,x))); };
   addOpts(prov,provs,false); addOpts(fProv,provs,true);
   const updateKab=(selKab,provName,withAll=false)=>{
     selKab.innerHTML=""; if(withAll) selKab.append(new Option("Semua",""));
@@ -141,7 +143,12 @@ function getOnsetDate(){
   return earliest;
 }
 function updateOnset(){ const onset=getOnsetDate(); document.getElementById('onsetTag').textContent = onset ? onset.toISOString().slice(0,10) : "—"; }
-function getRadio(name){ return (document.querySelector('input[name="'+name+'"]:checked'(())&&().value)))||''; }
+
+function getRadio(name) {
+  const el = document.querySelector(`input[name="${name}"]:checked`);
+  return el ? el.value : '';
+}
+
 
 function computeDefinisi(){
   const S={}; GEJALA.forEach(g=>{ S[g.id]=document.getElementById('g_'+g.((id))&&(id).checked)); });
@@ -252,7 +259,8 @@ function getFormData(){
   const gejala={}; const gejalaTgl={};
   GEJALA.forEach(g=>{ gejala[g.label]=document.getElementById('g_'+g.id).checked; gejalaTgl[g.label]=(document.getElementById('d_'+g.id).value||""); });
   const paparan=PAPARAN.map((p,idx)=>({label:p,checked:document.getElementById('p_'+idx).checked}));
-  const currUuid = (editingIndex>=0 ? (loadCases()[((editingIndex])&&(editingIndex].uuid))) : null) || editingUUID || genUUID();
+  const currentArr = loadCases();
+  const currUuid = (editingIndex >= 0 && currentArr[editingIndex]?.uuid) || editingUUID || genUUID();
   return {
     uuid: currUuid,
     nama:document.getElementById('nama').value,
@@ -760,42 +768,98 @@ async function scheduleAutoPull(){
     try{ recalcCasesFromLocalAndRefresh(); }catch(_){}
     setTimeout(()=>{
       try{ initMap(); }catch(_){}
-      try{ (function(){try{ if(typeof trendChart!=='undefined' && trendChart) trendChart.resize(); }catch(_){} })(); (function(){try{ if(typeof kabChart!=='undefined' && kabChart) kabChart.resize(); }catch(_){} })(); }catch(_){}
-      setTimeout(()=>{ if(window._leaf_map){ try{ if(window._leaf_map) window._leaf_map.invalidateSize(); fitIndonesia(); }catch(_){} } },200);
-      try{ scheduleAutoPull(); }catch(_){}
-    },100);
+      try{ (function(){try{ if(typeof trendChart!=='undefined' && trendChart) trendChart.resize(); }catch(_){} })(); 
+// =====================
+// AUTO UPDATE & STARTUP + TOKEN CORE (FIXED)
+// =====================
+(function () {
+  const OK_KEY = 'lepto_token_ok';
+  let unlocked = false;
+
+  function hideLock() {
+    const el = document.getElementById('lock');
+    if (el) { el.remove(); document.body.classList.remove('locked'); }
   }
-  function verifyToken(){
-    const val=(document.getElementById('tokenInput'(())&&().value))||'').trim();
-    const err=document.getElementById('lockErr');
-    if(val===ACCESS_TOKEN){
-      try{ localStorage.setItem(OK_KEY,'1'); localStorage.setItem('lepto_token', val); }catch(_){}
+  function showLock() {
+    const el = document.getElementById('lock');
+    if (!el) return;
+    el.classList.remove('hidden');
+    document.body.classList.add('locked');
+    bindHandlers();
+    setTimeout(() => {
+      const ti = document.getElementById('tokenInput');
+      if (ti) ti.focus();
+    }, 50);
+  }
+  function bindHandlers() {
+    const btn = document.getElementById('unlockBtn');
+    const form = document.getElementById('lockForm');
+    const input = document.getElementById('tokenInput');
+    const err = document.getElementById('lockErr');
+    if (err) { err.style.display = 'none'; err.textContent = ''; }
+    if (btn) btn.onclick = (e) => { e.preventDefault(); verifyToken(); };
+    if (form) form.onsubmit = (e) => { e.preventDefault(); verifyToken(); };
+    if (input) input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); verifyToken(); }
+    });
+  }
+  function afterUnlock() {
+    if (unlocked) return; unlocked = true;
+    hideLock();
+    try { renderTable(); renderCounts(); updateCharts(); } catch(_) {}
+    try { recalcCasesFromLocalAndRefresh(); } catch(_) {}
+    setTimeout(() => {
+      try { if (typeof initMap === 'function') initMap(); } catch(_) {}
+      try {
+        if (typeof trendChart !== 'undefined' && trendChart) trendChart.resize();
+        if (typeof kabChart !== 'undefined' && kabChart) kabChart.resize();
+      } catch(_) {}
+      setTimeout(() => {
+        if (window._leaf_map) {
+          try { window._leaf_map.invalidateSize(); if (typeof fitIndonesia==='function') fitIndonesia(); } catch(_) {}
+        }
+      }, 200);
+      try { if (typeof scheduleAutoPull==='function') scheduleAutoPull(); } catch(_) {}
+    }, 100);
+  }
+  function verifyToken() {
+    const val = (document.getElementById('tokenInput')?.value || '').trim();
+    const err = document.getElementById('lockErr');
+    if (val === ACCESS_TOKEN) {
+      try { localStorage.setItem(OK_KEY, '1'); localStorage.setItem('lepto_token', val); } catch(_) {}
       afterUnlock();
     } else {
-      if(err){ err.textContent='Token salah. Coba lagi.'; err.style.display='block'; }
+      if (err) { err.textContent = 'Token salah. Coba lagi.'; err.style.display = 'block'; }
     }
   }
-  function autoUnlockFromURL(){
-    try{
-      const sp=new URLSearchParams(location.search);
-      const t=sp.get('token'); const skip=sp.get('skipToken')==='1';
-      if(skip || (t && t.trim()===ACCESS_TOKEN)){
-        try{ localStorage.setItem(OK_KEY,'1'); }catch(_){}
-        try{ localStorage.setItem('lepto_token', ACCESS_TOKEN); }catch(_){}
+  function autoUnlockFromURL() {
+    try {
+      const sp = new URLSearchParams(location.search);
+      const t = sp.get('token');
+      const skip = sp.get('skipToken') === '1';
+      if (skip || (t && t.trim() === ACCESS_TOKEN)) {
+        try { localStorage.setItem(OK_KEY, '1'); localStorage.setItem('lepto_token', ACCESS_TOKEN); } catch(_) {}
         afterUnlock(); return true;
       }
-    }catch(_){}
+    } catch(_) {}
     return false;
   }
-  function autoUnlockFromSaved(){
-    try{
-      const ok = localStorage.getItem(OK_KEY)==='1';
-      const tok = (localStorage.getItem('lepto_token')||'').trim();
-      if(ok || tok===ACCESS_TOKEN){ afterUnlock(); return true; }
-    }catch(_){}
+  function autoUnlockFromSaved() {
+    try {
+      const ok = localStorage.getItem(OK_KEY) === '1';
+      const tok = (localStorage.getItem('lepto_token') || '').trim();
+      if (ok || tok === ACCESS_TOKEN) { afterUnlock(); return true; }
+    } catch(_) {}
     return false;
   }
-  function start(){ if(autoUnlockFromURL()) return; if(autoUnlockFromSaved()) return; showLock(); }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', start); else start();
+  function start() {
+    if (autoUnlockFromURL()) return;
+    if (autoUnlockFromSaved()) return;
+    showLock();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+
   window.__leptoToken = { verifyToken, showLock, afterUnlock };
 })();
+;
