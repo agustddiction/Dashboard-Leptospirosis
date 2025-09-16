@@ -727,23 +727,14 @@ async function scheduleAutoPull(){
 
 // =====================
 // AUTO UPDATE & STARTUP + TOKEN CORE
-// =====================
-const _root=document.querySelector('main');
-function _autoUpd(){ updateOnset(); updateDefinisiBadge(); toggleManualOnset(); }
-_root.addEventListener('input', _autoUpd, true);
-_root.addEventListener('change', _autoUpd, true);
-_root.addEventListener('keyup', _autoUpd, true);
-_root.addEventListener('click', _autoUpd, true);
-
-function _bindHeader(){ _bindHeaderShadow(); _syncTimeModeUI(); }
-initGejalaChecklist(); initPaparanChecklist();
-updateOnset(); updateDefinisiBadge(); ensureUUIDs(); renderTable(); renderCounts(); updateCharts(); _bindHeader(); bindRapidRadioUpdates();
-
-// TOKEN
 (function(){
   const OK_KEY = 'lepto_token_ok';
-  let unlocked=false;
-  function hideLock(){ const el=document.getElementById('lock'); if(el){ el.remove(); document.body.classList.remove('locked'); } }
+  let unlocked = false;
+
+  function hideLock(){
+    const el=document.getElementById('lock');
+    if(el){ el.remove(); document.body.classList.remove('locked'); }
+  }
   function showLock(){
     const el=document.getElementById('lock');
     if(!el) return;
@@ -753,62 +744,58 @@ updateOnset(); updateDefinisiBadge(); ensureUUIDs(); renderTable(); renderCounts
     setTimeout(()=>document.getElementById('tokenInput')?.focus(), 50);
   }
   function bindHandlers(){
-    const btn   = document.getElementById('unlockBtn');
-    const form  = document.getElementById('lockForm');
-    const input = document.getElementById('tokenInput');
-    const err   = document.getElementById('lockErr');
+    const btn=document.getElementById('unlockBtn');
+    const form=document.getElementById('lockForm');
+    const input=document.getElementById('tokenInput');
+    const err=document.getElementById('lockErr');
     if(err){ err.style.display='none'; err.textContent=''; }
-    if(input){
-      try{
-        const saved = (localStorage.getItem('lepto_token')||'').trim();
-        if(saved) input.value = saved;
-      }catch(_){}
-      input.focus();
-      input.addEventListener('keydown', (ev)=>{
-        if(ev.key === 'Enter'){
-          ev.preventDefault();
-          verifyToken();
-        }
-      });
-    }
-    if(btn)  btn.addEventListener('click',  e=>{ e.preventDefault(); verifyToken(); });
-    if(form) form.addEventListener('submit', e=>{ e.preventDefault(); verifyToken(); });
-  });
-    if(form) form.addEventListener('submit', e=>{ e.preventDefault(); verifyToken(); });
-    if(input) input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); verifyToken(); } });
+    if(btn){ btn.onclick = (e)=>{ e.preventDefault(); verifyToken(); }; }
+    if(form){ form.onsubmit = (e)=>{ e.preventDefault(); verifyToken(); }; }
+    if(input){ input.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); verifyToken(); } }); }
   }
   function afterUnlock(){
-    if(unlocked) return; unlocked=true;
+    if(unlocked) return; unlocked = true;
     hideLock();
     try{ renderTable(); renderCounts(); updateCharts(); }catch(_){}
     try{ recalcCasesFromLocalAndRefresh(); }catch(_){}
     setTimeout(()=>{
       try{ initMap(); }catch(_){}
       try{ trendChart?.resize(); kabChart?.resize(); }catch(_){}
-      setTimeout(()=>{ if(window._leaf_map){ try{ window._leaf_map.invalidateSize(); fitIndonesia(); }catch(_){}} },200);
+      setTimeout(()=>{ if(window._leaf_map){ try{ window._leaf_map.invalidateSize(); fitIndonesia(); }catch(_){} } },200);
       try{ scheduleAutoPull(); }catch(_){}
     },100);
   }
   function verifyToken(){
     const val=(document.getElementById('tokenInput')?.value||'').trim();
     const err=document.getElementById('lockErr');
-    if(val===ACCESS_TOKEN){ try{ localStorage.setItem(OK_KEY,'1'); }catch(_){ } afterUnlock(); }
-    else { if(err){ err.textContent='Token salah. Coba lagi.'; err.style.display='block'; } }
+    if(val===ACCESS_TOKEN){
+      try{ localStorage.setItem(OK_KEY,'1'); localStorage.setItem('lepto_token', val); }catch(_){}
+      afterUnlock();
+    } else {
+      if(err){ err.textContent='Token salah. Coba lagi.'; err.style.display='block'; }
+    }
   }
   function autoUnlockFromURL(){
     try{
-      const sp = new URLSearchParams(location.search);
-      const urlTok = sp.get('token');
-      if(urlTok && urlTok.trim() === ACCESS_TOKEN){
+      const sp=new URLSearchParams(location.search);
+      const t=sp.get('token'); const skip=sp.get('skipToken')==='1';
+      if(skip || (t && t.trim()===ACCESS_TOKEN)){
+        try{ localStorage.setItem(OK_KEY,'1'); }catch(_){}
         try{ localStorage.setItem('lepto_token', ACCESS_TOKEN); }catch(_){}
-        try{ localStorage.setItem('lepto_token_ok','1'); }catch(_){}
-        afterUnlock();
-        return true;
+        afterUnlock(); return true;
       }
+    }catch(_){}
+    return false;
+  }
+  function autoUnlockFromSaved(){
+    try{
+      const ok = localStorage.getItem(OK_KEY)==='1';
+      const tok = (localStorage.getItem('lepto_token')||'').trim();
+      if(ok || tok===ACCESS_TOKEN){ afterUnlock(); return true; }
     }catch(_){}
     return false;
   }
   function start(){ if(autoUnlockFromURL()) return; if(autoUnlockFromSaved()) return; showLock(); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', start); else start();
-  window.__leptoToken={ verifyToken, showLock, afterUnlock };
+  window.__leptoToken = { verifyToken, showLock, afterUnlock };
 })();
