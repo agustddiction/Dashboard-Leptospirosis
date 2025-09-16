@@ -106,3 +106,17 @@ body.locked{ overflow:hidden }
 
 .hr{ height:1px; background:var(--line); margin:10px 0 }
 .footnote{ color:var(--muted); font-size:12px; margin-top:8px }
+
+
+/* --- Tidy filters: consistent heights & spacing --- */
+.sticky-filters .toolbar{ padding:4px 2px; }
+.filters-grid select,
+.filters-grid input[type="month"],
+.filters-grid input[type="number"]{ height: 36px; }
+
+/* Keep month/year range inputs aligned */
+#monthRangeWrap .range-inline input[type="month"],
+#yearRangeWrap .range-inline input[type="number"]{ min-width: 160px; }
+
+/* Ensure Prov/Kab selects align nicely side by side */
+.filters-grid .grid-2 > div select{ min-width: 160px; }

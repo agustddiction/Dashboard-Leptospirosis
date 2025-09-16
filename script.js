@@ -562,6 +562,40 @@ async function readSheetCases(){
   return flat.map(flatToCase);
 }
 
+
+// --- Helpers: de-duplicate local & first sync ---
+function dedupeLocalInPlace(){
+  try{ ensureUUIDs(); }catch(_){}
+  const arr = loadCases();
+  if(!Array.isArray(arr) || !arr.length){ return; }
+  const byKey = new Map();
+  const toDate = s => { try{ return new Date(s); }catch(_){ return new Date(0);} };
+  for(const d of arr){
+    const k = getKey(d);
+    if(!byKey.has(k)){ byKey.set(k, d); }
+    else{
+      const a = byKey.get(k);
+      const tA = toDate(a.savedAt||a.tglStatus||a.onset||'1970-01-01');
+      const tB = toDate(d.savedAt||d.tglStatus||d.onset||'1970-01-01');
+      if(tB > tA) byKey.set(k, d);
+    }
+  }
+  const unique = Array.from(byKey.values());
+  saveCases(unique);
+}
+
+async function firstSync(){
+  // 1) Clean local duplicates
+  dedupeLocalInPlace();
+  // 2) Merge from remote sheet (if available)
+  try{
+    await pullFromSheets({merge:true, silent:true});
+  }catch(e){
+    console.warn('firstSync: pull failed (will continue with local only)', e);
+  }
+  // 3) Ensure clean state after merge
+  dedupeLocalInPlace();
+}
 async function pullFromSheets(opts={merge:true, silent:false}){
   if(!SPREADSHEET_ID || SPREADSHEET_ID.startsWith('GANTI_')){
     if(!opts.silent) alert('SPREADSHEET_ID belum diisi di script.js');
@@ -591,10 +625,26 @@ document.getElementById('pullSheets')?.addEventListener('click', ()=>pullFromShe
 async function sendRowToSheets(row){
   if(!SHEETS_URL){ console.warn('SHEETS_URL kosong'); return; }
   try{
-    const arr = loadCases(); ensureUUIDs();
+    ensureUUIDs();
+    const arr = loadCases();
     const key = getKey(arr[arr.length-1] || {});
+
+    // Load local sent keys
     const sent = JSON.parse(localStorage.getItem('lepto_sent_keys')||'[]');
-    if(sent.includes(key)){ console.log('Lewati kirim: baris sudah pernah dikirim'); return; }
+
+    // Remote existence check to prevent duplicate rows in the Sheet
+    let remoteHas = false;
+    try{
+      const remote = await readSheetCases();
+      const remoteKeys = new Set(remote.map(getKey));
+      remoteHas = remoteKeys.has(key);
+    }catch(_e){ /* ignore; continue best-effort */ }
+
+    if(remoteHas || sent.includes(key)){
+      console.log('Lewati kirim: baris sudah ada di Sheet / sudah pernah dikirim');
+      return;
+    }
+
     await fetch(SHEETS_URL, {
       method: 'POST', mode: 'no-cors',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -699,7 +749,7 @@ _root.addEventListener('click', _autoUpd, true);
 
 function _bindHeader(){ _bindHeaderShadow(); _syncTimeModeUI(); }
 initGejalaChecklist(); initPaparanChecklist();
-updateOnset(); updateDefinisiBadge(); ensureUUIDs(); renderTable(); renderCounts(); updateCharts(); _bindHeader(); bindRapidRadioUpdates();
+updateOnset(); updateDefinisiBadge(); ensureUUIDs(); dedupeLocalInPlace(); renderTable(); renderCounts(); updateCharts(); _bindHeader(); bindRapidRadioUpdates();
 
 // TOKEN
 (function(){
@@ -724,10 +774,21 @@ updateOnset(); updateDefinisiBadge(); ensureUUIDs(); renderTable(); renderCounts
     if(form) form.addEventListener('submit', e=>{ e.preventDefault(); verifyToken(); });
     if(input) input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); verifyToken(); } });
   }
-  function afterUnlock(){
+  async function afterUnlock(){
     if(unlocked) return; unlocked=true;
     hideLock();
+    try{
+      await firstSync(); // ensure no duplicates both locally and from Sheet before first render
+    }catch(_){}
     try{ renderTable(); renderCounts(); updateCharts(); }catch(_){}
+    try{ recalcCasesFromLocalAndRefresh(); }catch(_){}
+    setTimeout(()=>{
+      try{ initMap(); }catch(_){}
+      try{ trendChart?.resize(); kabChart?.resize(); }catch(_){}
+      setTimeout(()=>{ if(window._leaf_map){ try{ window._leaf_map.invalidateSize(); fitIndonesia(); }catch(_){} } },200);
+      try{ scheduleAutoPull(); }catch(_){}
+    },100);
+  }catch(_){}
     try{ recalcCasesFromLocalAndRefresh(); }catch(_){}
     setTimeout(()=>{
       try{ initMap(); }catch(_){}
@@ -754,3 +815,10 @@ updateOnset(); updateDefinisiBadge(); ensureUUIDs(); renderTable(); renderCounts
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', start); else start();
   window.__leptoToken={ verifyToken, showLock, afterUnlock };
 })();
+
+
+// Reset form button
+document.getElementById('reset')?.addEventListener('click', (e)=>{
+  e.preventDefault();
+  resetForm();
+});
