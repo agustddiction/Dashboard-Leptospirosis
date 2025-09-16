@@ -54,7 +54,7 @@ textarea{ min-height:70px; resize:vertical }
 .sticky-filters{ position:sticky; top:64px; z-index:10; background:#fff; border:1px solid var(--line); border-radius:12px; padding:10px; }
 .filters-grid{
   display:grid;
-  grid-template-columns: 180px 1fr 1fr auto; /* mode waktu | rentang | rentang/Prov-Kab | tombol */
+  grid-template-columns: repeat(4, minmax(0, 1fr)); /* 4 kolom proporsional */
   gap:10px;
   align-items:end;
 }
@@ -108,15 +108,14 @@ body.locked{ overflow:hidden }
 .footnote{ color:var(--muted); font-size:12px; margin-top:8px }
 
 
-/* --- Tidy filters: consistent heights & spacing --- */
-.sticky-filters .toolbar{ padding:4px 2px; }
-.filters-grid select,
-.filters-grid input[type="month"],
-.filters-grid input[type="number"]{ height: 36px; }
+/* Proportional filter layout */
+.filters-grid .actions{ display:flex; justify-content:flex-end; align-items:end; }
+.filters-grid label{ font-size:12px; color:var(--muted); display:block; margin-bottom:4px; }
+.filters-grid select, .filters-grid input[type="month"], .filters-grid input[type="number"]{ height:36px; width:100%; }
+.filters-grid .grid-2 > div select{ min-width:unset; } /* biar ikut 1fr */
+.range-inline .sep{ opacity:.6; }
 
-/* Keep month/year range inputs aligned */
-#monthRangeWrap .range-inline input[type="month"],
-#yearRangeWrap .range-inline input[type="number"]{ min-width: 160px; }
-
-/* Ensure Prov/Kab selects align nicely side by side */
-.filters-grid .grid-2 > div select{ min-width: 160px; }
+@media (max-width: 720px){
+  .filters-grid{ grid-template-columns: 1fr 1fr; }
+  .filters-grid .span2{ grid-column: span 2; }
+}

@@ -2,16 +2,6 @@
 // KONFIGURASI
 // =====================
 const ACCESS_TOKEN = 'ZOOLEPTO123';
-// Token dinamis: bisa diisi dari input/URL dan disimpan di localStorage
-const TOKEN_LS_KEY = 'lepto_token';
-function getActiveToken(){ 
-  const t = (localStorage.getItem(TOKEN_LS_KEY)||'').trim();
-  return t || ACCESS_TOKEN; // fallback ke default jika belum diisi
-}
-function setActiveToken(val){
-  try{ localStorage.setItem(TOKEN_LS_KEY, (val||'').trim()); }catch(_){}
-}
-
 const DEFAULT_GH = 'https://raw.githubusercontent.com/agustddiction/Dashboard-Leptospirosis/main/provinsi.json';
 // Google Sheets WRITE (Apps Script /exec)
 const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbxFHgRel9-LTQTc0YIjy5G22BWk1RiqUjjDqCd8XE1Q4tF8h4t5r8X9WL-MwVZ2IyyYHg/exec'; // isi URL Web App /exec
@@ -227,7 +217,34 @@ function duplicateKey(d){ return [norm(d.nama),norm(d.umur),norm(d.alamat),d.ons
 function getKey(d){ return (d && d.uuid) ? ('uuid:'+d.uuid) : ('dup:'+duplicateKey(d)); }
 
 function loadCases(){ try{return JSON.parse(localStorage.getItem('lepto_cases')||'[]');}catch(e){return[]} }
-function saveCases(arr){ localStorage.setItem('lepto_cases', JSON.stringify(arr)); }
+
+function isMeaningfulCase(d){
+  if(!d) return false;
+  const hasId = !!(d.uuid && String(d.uuid).trim().length>0);
+  const hasName = !!(d.nama && String(d.nama).trim().length>0);
+  const hasLoc = !!((d.prov && String(d.prov).trim().length>0) || (d.kab && String(d.kab).trim().length>0));
+  const hasOnset = !!(d.onset && String(d.onset).trim().length>0);
+  const hasStatus = !!(d.statusAkhir && String(d.statusAkhir).trim().length>0);
+  const L = d.lab || {}; const hasLab = (L.rdt && L.rdt!=='nd') || (L.mat && L.mat!=='nd') || (L.pcr && L.pcr!=='nd');
+  return hasId || hasName || hasLoc || hasOnset || hasStatus || hasLab;
+}
+function saveCases(arr){
+  const toDate = s => { try{ return new Date(s); }catch(_){ return new Date(0);} };
+  const cleaned = (Array.isArray(arr)?arr:[]).filter(isMeaningfulCase);
+  const byKey = new Map();
+  for(const d of cleaned){
+    const k = getKey(d);
+    if(!byKey.has(k)) byKey.set(k, d);
+    else {
+      const a = byKey.get(k);
+      const tA = toDate(a.savedAt||a.tglStatus||a.onset||'1970-01-01');
+      const tB = toDate(d.savedAt||d.tglStatus||d.onset||'1970-01-01');
+      if(tB>tA) byKey.set(k, d);
+    }
+  }
+  const unique = Array.from(byKey.values());
+  localStorage.setItem('lepto_cases', JSON.stringify(unique));
+}
 function ensureUUIDs(){ const arr=loadCases(); let changed=false; arr.forEach(d=>{ if(!d.uuid){ d.uuid=genUUID(); changed=true; } }); if(changed) saveCases(arr); }
 
 function getFormData(){
@@ -335,7 +352,7 @@ function renderCounts(){
 function defClass(def){ if(def==='Confirm') return 'ok'; if(def==='Probable') return 'warn'; if(def==='Suspek') return ''; return 'bad'; }
 function renderTable(){
   const tbody=document.querySelector('#casesTable tbody'); tbody.innerHTML='';
-  const data=loadCases();
+  const data=(loadCases()||[]).filter(isMeaningfulCase);
   data.forEach((d,i)=>{
     const tr=document.createElement('tr');
     tr.innerHTML=`
@@ -569,43 +586,10 @@ async function readSheetCases(){
   const res = await fetch(SHEETS_READ_URL, { mode:'cors', cache:'no-store' });
   const text = await res.text();
   const flat = parseGVizJSON(text);
-  return flat.map(flatToCase);
+  const arr = flat.map(flatToCase).filter(isMeaningfulCase);
+  return arr;
 }
 
-
-// --- Helpers: de-duplicate local & first sync ---
-function dedupeLocalInPlace(){
-  try{ ensureUUIDs(); }catch(_){}
-  const arr = loadCases();
-  if(!Array.isArray(arr) || !arr.length){ return; }
-  const byKey = new Map();
-  const toDate = s => { try{ return new Date(s); }catch(_){ return new Date(0);} };
-  for(const d of arr){
-    const k = getKey(d);
-    if(!byKey.has(k)){ byKey.set(k, d); }
-    else{
-      const a = byKey.get(k);
-      const tA = toDate(a.savedAt||a.tglStatus||a.onset||'1970-01-01');
-      const tB = toDate(d.savedAt||d.tglStatus||d.onset||'1970-01-01');
-      if(tB > tA) byKey.set(k, d);
-    }
-  }
-  const unique = Array.from(byKey.values());
-  saveCases(unique);
-}
-
-async function firstSync(){
-  // 1) Clean local duplicates
-  dedupeLocalInPlace();
-  // 2) Merge from remote sheet (if available)
-  try{
-    await pullFromSheets({merge:true, silent:true});
-  }catch(e){
-    console.warn('firstSync: pull failed (will continue with local only)', e);
-  }
-  // 3) Ensure clean state after merge
-  dedupeLocalInPlace();
-}
 async function pullFromSheets(opts={merge:true, silent:false}){
   if(!SPREADSHEET_ID || SPREADSHEET_ID.startsWith('GANTI_')){
     if(!opts.silent) alert('SPREADSHEET_ID belum diisi di script.js');
@@ -620,6 +604,7 @@ async function pullFromSheets(opts={merge:true, silent:false}){
     } else {
       saveCases(remoteCases);
     }
+    dedupeLocalInPlace();
     renderTable(); renderCounts(); updateCharts(); recalcCasesFromLocalAndRefresh();
     const now = new Date().toLocaleString('id-ID');
     setPullStatus(`Tarik otomatis OK • ${now}`);
@@ -635,30 +620,14 @@ document.getElementById('pullSheets')?.addEventListener('click', ()=>pullFromShe
 async function sendRowToSheets(row){
   if(!SHEETS_URL){ console.warn('SHEETS_URL kosong'); return; }
   try{
-    ensureUUIDs();
-    const arr = loadCases();
+    const arr = loadCases(); ensureUUIDs();
     const key = getKey(arr[arr.length-1] || {});
-
-    // Load local sent keys
     const sent = JSON.parse(localStorage.getItem('lepto_sent_keys')||'[]');
-
-    // Remote existence check to prevent duplicate rows in the Sheet
-    let remoteHas = false;
-    try{
-      const remote = await readSheetCases();
-      const remoteKeys = new Set(remote.map(getKey));
-      remoteHas = remoteKeys.has(key);
-    }catch(_e){ /* ignore; continue best-effort */ }
-
-    if(remoteHas || sent.includes(key)){
-      console.log('Lewati kirim: baris sudah ada di Sheet / sudah pernah dikirim');
-      return;
-    }
-
+    if(sent.includes(key)){ console.log('Lewati kirim: baris sudah pernah dikirim'); return; }
     await fetch(SHEETS_URL, {
       method: 'POST', mode: 'no-cors',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ token: getActiveToken(), action: 'append', row })
+      body: JSON.stringify({ token: ACCESS_TOKEN, action: 'append', row })
     });
     sent.push(key); localStorage.setItem('lepto_sent_keys', JSON.stringify(sent));
   }catch(e){ console.warn('Gagal kirim Sheets:', e); }
@@ -698,7 +667,7 @@ async function sendAllToSheets(){
     await fetch(SHEETS_URL, {
       method: 'POST', mode: 'no-cors',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ token: getActiveToken(), action: 'appendBatch', rows: toSend.map(flattenCase) })
+      body: JSON.stringify({ token: ACCESS_TOKEN, action: 'appendBatch', rows: toSend.map(flattenCase) })
     });
     alert('Permintaan sync dikirim: '+toSend.length+' baris baru.');
   }catch(e){ alert('Gagal sync: '+e); }
@@ -729,7 +698,7 @@ async function sendReplaceAllToSheets(){
     await fetch(SHEETS_URL, {
       method: 'POST', mode: 'no-cors',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ token: getActiveToken(), action: 'replaceAll', rows: uniqueLatest.map(flattenCase) })
+      body: JSON.stringify({ token: ACCESS_TOKEN, action: 'replaceAll', rows: uniqueLatest.map(flattenCase) })
     });
     alert('Permintaan Full Sync (Replace All) dikirim. Periksa Google Sheet Anda.');
   }catch(e){
@@ -759,125 +728,58 @@ _root.addEventListener('click', _autoUpd, true);
 
 function _bindHeader(){ _bindHeaderShadow(); _syncTimeModeUI(); }
 initGejalaChecklist(); initPaparanChecklist();
-updateOnset(); updateDefinisiBadge(); ensureUUIDs(); dedupeLocalInPlace(); renderTable(); renderCounts(); updateCharts(); _bindHeader(); bindRapidRadioUpdates();
+updateOnset(); updateDefinisiBadge(); ensureUUIDs(); renderTable(); renderCounts(); updateCharts(); _bindHeader(); bindRapidRadioUpdates();
 
 // TOKEN
 (function(){
   const OK_KEY = 'lepto_token_ok';
-  let unlocked = false;
-
-  function hideLock(){
-    const el = document.getElementById('lock');
-    if(el){
-      el.remove();
-      document.body.classList.remove('locked');
-    }
-  }
-
+  let unlocked=false;
+  function hideLock(){ const el=document.getElementById('lock'); if(el){ el.remove(); document.body.classList.remove('locked'); } }
   function showLock(){
-    const el = document.getElementById('lock');
+    const el=document.getElementById('lock');
     if(!el) return;
     el.classList.remove('hidden');
     document.body.classList.add('locked');
     bindHandlers();
     setTimeout(()=>document.getElementById('tokenInput')?.focus(), 50);
   }
-
   function bindHandlers(){
-    const btn   = document.getElementById('unlockBtn');
-    const form  = document.getElementById('lockForm');
-    const input = document.getElementById('tokenInput');
-    const err   = document.getElementById('lockErr');
+    const btn=document.getElementById('unlockBtn');
+    const form=document.getElementById('lockForm');
+    const input=document.getElementById('tokenInput');
+    const err=document.getElementById('lockErr');
     if(err) err.style.display='none';
-    if(input){
-      try{
-        const saved = (localStorage.getItem(TOKEN_LS_KEY)||'').trim();
-        if(saved) input.value = saved;
-      }catch(_){}
-    }
-    if(btn)  btn.addEventListener('click',  e=>{ e.preventDefault(); verifyToken(); });
-    if(form) form.addEventListener('submit',e=>{ e.preventDefault(); verifyToken(); });
+    if(btn) btn.addEventListener('click', e=>{ e.preventDefault(); verifyToken(); });
+    if(form) form.addEventListener('submit', e=>{ e.preventDefault(); verifyToken(); });
+    if(input) input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); verifyToken(); } });
   }
-
-  async function afterUnlock(){
-    if(unlocked) return;
-    unlocked = true;
+  function afterUnlock(){
+    if(unlocked) return; unlocked=true;
     hideLock();
-    try{ await firstSync(); }catch(_){}
     try{ renderTable(); renderCounts(); updateCharts(); }catch(_){}
     try{ recalcCasesFromLocalAndRefresh(); }catch(_){}
     setTimeout(()=>{
       try{ initMap(); }catch(_){}
       try{ trendChart?.resize(); kabChart?.resize(); }catch(_){}
-      setTimeout(()=>{ if(window._leaf_map){ try{ window._leaf_map.invalidateSize(); fitIndonesia(); }catch(_){} } },200);
+      setTimeout(()=>{ if(window._leaf_map){ try{ window._leaf_map.invalidateSize(); fitIndonesia(); }catch(_){}} },200);
       try{ scheduleAutoPull(); }catch(_){}
     },100);
   }
-
   function verifyToken(){
-    const inputEl = document.getElementById('tokenInput');
-    const val = (inputEl?.value||'').trim();
-    const err = document.getElementById('lockErr');
-    if(!val){
-      if(err){ err.textContent='Token tidak boleh kosong.'; err.style.display='block'; }
-      inputEl?.focus();
-      return;
-    }
-    setActiveToken(val);
-    try{ localStorage.setItem(OK_KEY,'1'); }catch(_){}
-    afterUnlock();
+    const val=(document.getElementById('tokenInput')?.value||'').trim();
+    const err=document.getElementById('lockErr');
+    if(val===ACCESS_TOKEN){ try{ localStorage.setItem(OK_KEY,'1'); }catch(_){ } afterUnlock(); }
+    else { if(err){ err.textContent='Token salah. Coba lagi.'; err.style.display='block'; } }
   }
-
   function autoUnlockFromURL(){
     try{
-      const sp = new URLSearchParams(location.search);
-      const urlTok = sp.get('token');
-      const skip   = sp.get('skipToken') === '1';
-      if(skip){
-        try{ localStorage.setItem(OK_KEY,'1'); }catch(_){}
-        afterUnlock();
-        return true;
-      }
-      if(urlTok && urlTok.trim().length>0){
-        setActiveToken(urlTok.trim());
-        try{ localStorage.setItem(OK_KEY,'1'); }catch(_){}
-        afterUnlock();
-        return true;
-      }
+      const sp=new URLSearchParams(location.search);
+      const t=sp.get('token'); const skip=sp.get('skipToken')==='1';
+      if(skip || t===ACCESS_TOKEN){ try{ localStorage.setItem(OK_KEY,'1'); }catch(_){ } afterUnlock(); return true; }
     }catch(_){}
     return false;
   }
-
-  function autoUnlockFromSaved(){
-    try{
-      const ok = localStorage.getItem(OK_KEY) === '1';
-      const saved = (localStorage.getItem(TOKEN_LS_KEY)||'').trim();
-      if(ok && saved){
-        afterUnlock();
-        return true;
-      }
-    }catch(_){}
-    return false;
-  }
-
-  function start(){
-    if(autoUnlockFromURL()) return;
-    if(autoUnlockFromSaved()) return;
-    showLock();
-  }
-
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', start);
-  else start();
-
-  // expose for debugging
-  window.__leptoToken = { verifyToken, showLock, afterUnlock };
+  function start(){ if(autoUnlockFromURL()) return; showLock(); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', start); else start();
+  window.__leptoToken={ verifyToken, showLock, afterUnlock };
 })();
-
-
-// Reset form button
-document.getElementById('reset')?.addEventListener('click', (e)=>{
-  e.preventDefault();
-  resetForm();
-});
-
-
