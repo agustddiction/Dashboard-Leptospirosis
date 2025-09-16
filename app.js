@@ -103,9 +103,10 @@
   function updateOnsetVisibility(){
     const any = Array.from(document.querySelectorAll('#gejalaGrid input[type=checkbox]')).some(x=>x.checked);
     const wrap = document.getElementById('manualOnsetWrap');
-    if (wrap){ wrap.classList.toggle('hidden', !any ? true : false); } // show only when any checked
+    // TAMPIL hanya jika ADA gejala dicentang
+    if (wrap){ wrap.classList.toggle('hidden', !any); }
+  } // show only when any checked
   } // hide when any checked; show only when none
-  }
   }
   function onAnyInputChanged(){ updateDefBadge(); updateOnsetTag(); updateOnsetVisibility(); refreshCharts(); drawChoropleth(); }
 
@@ -190,13 +191,6 @@
       kabChart = new Chart(ctx2, { type:'bar', data:{ labels:kabKeys, datasets:[{ label:'Top Kabupaten', data:kabVals }] }, options:{ responsive:true, maintainAspectRatio:false }});
     }
   }
-const data = computeFiltered(); const pts=[];
-    data.forEach(it=>{ if(it.lat && it.lng){ const m=L.marker([it.lat,it.lng]).addTo(map); m.bindPopup(`<b>${it.nama||'Kasus'}</b><br>${it.kabupaten||''}, ${it.provinsi||''}<br>${it.tanggal_onset||''}`); pts.push([it.lat,it.lng]); } });
-    const msg=document.getElementById('mapMsg');
-    if (pts.length){ const b=L.latLngBounds(pts); try{ map.fitBounds(b.pad(0.15)); }catch(_){} if(msg) msg.textContent=''; }
-    else { if(msg) msg.textContent='Belum ada titik koordinat pada data kasus.'; }
-  }
-
   function _syncTimeModeUI(){
     const mode = (document.getElementById('fTimeMode')?.value)||'month';
     const m = document.getElementById('monthRangeWrap');
@@ -326,7 +320,13 @@ const data = computeFiltered(); const pts=[];
     });
   }
 
-  function boot(){ renderGejalaPaparan(); updateOnsetVisibility();  renderGejalaPaparan(); wire(); refreshAll(); _syncTimeModeUI(); updateOnsetVisibility(); }
+  function boot(){
+    renderGejalaPaparan();
+    updateOnsetVisibility();
+    wire();
+    refreshAll();
+    _syncTimeModeUI();
+  }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 
   window.renderTable=function(){}; window.renderCounts=function(){}; window.updateCharts=refreshCharts; window.recalcCasesFromLocalAndRefresh=refreshAll; window.initMap=initMap; window.scheduleAutoPull=function(){};
