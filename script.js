@@ -2,6 +2,16 @@
 // KONFIGURASI
 // =====================
 const ACCESS_TOKEN = 'ZOOLEPTO123';
+// Token dinamis: bisa diisi dari input/URL dan disimpan di localStorage
+const TOKEN_LS_KEY = 'lepto_token';
+function getActiveToken(){ 
+  const t = (localStorage.getItem(TOKEN_LS_KEY)||'').trim();
+  return t || ACCESS_TOKEN; // fallback ke default jika belum diisi
+}
+function setActiveToken(val){
+  try{ localStorage.setItem(TOKEN_LS_KEY, (val||'').trim()); }catch(_){}
+}
+
 const DEFAULT_GH = 'https://raw.githubusercontent.com/agustddiction/Dashboard-Leptospirosis/main/provinsi.json';
 // Google Sheets WRITE (Apps Script /exec)
 const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbxFHgRel9-LTQTc0YIjy5G22BWk1RiqUjjDqCd8XE1Q4tF8h4t5r8X9WL-MwVZ2IyyYHg/exec'; // isi URL Web App /exec
@@ -648,7 +658,7 @@ async function sendRowToSheets(row){
     await fetch(SHEETS_URL, {
       method: 'POST', mode: 'no-cors',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ token: ACCESS_TOKEN, action: 'append', row })
+      body: JSON.stringify({ token: getActiveToken(), action: 'append', row })
     });
     sent.push(key); localStorage.setItem('lepto_sent_keys', JSON.stringify(sent));
   }catch(e){ console.warn('Gagal kirim Sheets:', e); }
@@ -688,7 +698,7 @@ async function sendAllToSheets(){
     await fetch(SHEETS_URL, {
       method: 'POST', mode: 'no-cors',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ token: ACCESS_TOKEN, action: 'appendBatch', rows: toSend.map(flattenCase) })
+      body: JSON.stringify({ token: getActiveToken(), action: 'appendBatch', rows: toSend.map(flattenCase) })
     });
     alert('Permintaan sync dikirim: '+toSend.length+' baris baru.');
   }catch(e){ alert('Gagal sync: '+e); }
@@ -719,7 +729,7 @@ async function sendReplaceAllToSheets(){
     await fetch(SHEETS_URL, {
       method: 'POST', mode: 'no-cors',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ token: ACCESS_TOKEN, action: 'replaceAll', rows: uniqueLatest.map(flattenCase) })
+      body: JSON.stringify({ token: getActiveToken(), action: 'replaceAll', rows: uniqueLatest.map(flattenCase) })
     });
     alert('Permintaan Full Sync (Replace All) dikirim. Periksa Google Sheet Anda.');
   }catch(e){
@@ -770,7 +780,15 @@ updateOnset(); updateDefinisiBadge(); ensureUUIDs(); dedupeLocalInPlace(); rende
     const input=document.getElementById('tokenInput');
     const err=document.getElementById('lockErr');
     if(err) err.style.display='none';
+    if(input){
+      try{
+        const saved = (localStorage.getItem(TOKEN_LS_KEY)||'').trim();
+        if(saved) input.value = saved;
+      }catch(_){}
+    }
     if(btn) btn.addEventListener('click', e=>{ e.preventDefault(); verifyToken(); });
+    if(form) form.addEventListener('submit', e=>{ e.preventDefault(); verifyToken(); });
+  });
     if(form) form.addEventListener('submit', e=>{ e.preventDefault(); verifyToken(); });
     if(input) input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); verifyToken(); } });
   }
@@ -798,12 +816,48 @@ updateOnset(); updateDefinisiBadge(); ensureUUIDs(); dedupeLocalInPlace(); rende
     },100);
   }
   function verifyToken(){
-    const val=(document.getElementById('tokenInput')?.value||'').trim();
-    const err=document.getElementById('lockErr');
-    if(val===ACCESS_TOKEN){ try{ localStorage.setItem(OK_KEY,'1'); }catch(_){ } afterUnlock(); }
+    const inputEl = document.getElementById('tokenInput');
+    const val = (inputEl?.value||'').trim();
+    const err = document.getElementById('lockErr');
+    if(!val){
+      if(err){ err.textContent='Token tidak boleh kosong.'; err.style.display='block'; }
+      inputEl?.focus();
+      return;
+    }
+    // Simpan & buka
+    setActiveToken(val);
+    try{ localStorage.setItem(OK_KEY,'1'); }catch(_){}
+    afterUnlock();
+  }catch(_){ } afterUnlock(); }
     else { if(err){ err.textContent='Token salah. Coba lagi.'; err.style.display='block'; } }
   }
   function autoUnlockFromURL(){
+    try{
+      const sp=new URLSearchParams(location.search);
+      const urlTok = sp.get('token');
+      const skip= sp.get('skipToken')==='1';
+      if(skip){ try{ localStorage.setItem(OK_KEY,'1'); }catch(_){ } afterUnlock(); return true; }
+      if(urlTok && urlTok.trim().length>0){
+        setActiveToken(urlTok.trim());
+        try{ localStorage.setItem(OK_KEY,'1'); }catch(_){ }
+        afterUnlock(); 
+        return true;
+      }
+    }catch(_){}
+    return false;
+  }
+  function autoUnlockFromSaved(){
+    try{
+      const ok = localStorage.getItem(OK_KEY)==='1';
+      const saved = (localStorage.getItem(TOKEN_LS_KEY)||'').trim();
+      if(ok && saved){
+        afterUnlock();
+        return true;
+      }
+    }catch(_){}
+    return false;
+  }
+  
     try{
       const sp=new URLSearchParams(location.search);
       const t=sp.get('token'); const skip=sp.get('skipToken')==='1';
@@ -811,7 +865,7 @@ updateOnset(); updateDefinisiBadge(); ensureUUIDs(); dedupeLocalInPlace(); rende
     }catch(_){}
     return false;
   }
-  function start(){ if(autoUnlockFromURL()) return; showLock(); }
+  function start(){ if(autoUnlockFromURL()) return; if(autoUnlockFromSaved()) return; showLock(); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', start); else start();
   window.__leptoToken={ verifyToken, showLock, afterUnlock };
 })();
@@ -822,3 +876,21 @@ document.getElementById('reset')?.addEventListener('click', (e)=>{
   e.preventDefault();
   resetForm();
 });
+
+
+// Change token button handler (outside IIFE)
+(function(){
+  const btn = document.getElementById('changeToken');
+  if(btn){
+    btn.addEventListener('click', (e)=>{
+      e.preventDefault();
+      try{ localStorage.removeItem('lepto_ok'); }catch(_){}
+      try{ localStorage.removeItem('lepto_token'); }catch(_){}
+      if(window.__leptoToken && typeof window.__leptoToken.showLock==='function'){
+        window.__leptoToken.showLock();
+      } else {
+        alert('Form token tidak tersedia.');
+      }
+    });
+  }
+})();
