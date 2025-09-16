@@ -19,9 +19,9 @@
     <div class="lock-card">
       <div class="lock-title">Akses Terbatas</div>
       <div class="lock-sub">Masukkan token untuk membuka dashboard.</div>
-      <form id="lockForm" class="lock-row">
+      <form id="lockForm" class="lock-row" novalidate>
         <input id="tokenInput" type="text" placeholder="Masukkan token…" autocomplete="off" />
-        <button id="unlockBtn" type="submit" class="btn primary">Masuk</button>
+        <button id="unlockBtn" type="button" class="btn primary">Masuk</button>
       </form>
       <div id="lockErr" class="lock-err">Token salah. Coba lagi.</div>
     </div>
