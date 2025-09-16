@@ -753,12 +753,27 @@ updateOnset(); updateDefinisiBadge(); ensureUUIDs(); renderTable(); renderCounts
     setTimeout(()=>document.getElementById('tokenInput')?.focus(), 50);
   }
   function bindHandlers(){
-    const btn=document.getElementById('unlockBtn');
-    const form=document.getElementById('lockForm');
-    const input=document.getElementById('tokenInput');
-    const err=document.getElementById('lockErr');
-    if(err) err.style.display='none';
-    if(btn) btn.addEventListener('click', e=>{ e.preventDefault(); verifyToken(); });
+    const btn   = document.getElementById('unlockBtn');
+    const form  = document.getElementById('lockForm');
+    const input = document.getElementById('tokenInput');
+    const err   = document.getElementById('lockErr');
+    if(err){ err.style.display='none'; err.textContent=''; }
+    if(input){
+      try{
+        const saved = (localStorage.getItem('lepto_token')||'').trim();
+        if(saved) input.value = saved;
+      }catch(_){}
+      input.focus();
+      input.addEventListener('keydown', (ev)=>{
+        if(ev.key === 'Enter'){
+          ev.preventDefault();
+          verifyToken();
+        }
+      });
+    }
+    if(btn)  btn.addEventListener('click',  e=>{ e.preventDefault(); verifyToken(); });
+    if(form) form.addEventListener('submit', e=>{ e.preventDefault(); verifyToken(); });
+  });
     if(form) form.addEventListener('submit', e=>{ e.preventDefault(); verifyToken(); });
     if(input) input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); verifyToken(); } });
   }
@@ -793,7 +808,7 @@ updateOnset(); updateDefinisiBadge(); ensureUUIDs(); renderTable(); renderCounts
     }catch(_){}
     return false;
   }
-  function start(){ if(autoUnlockFromURL()) return; showLock(); }
+  function start(){ if(autoUnlockFromURL()) return; if(autoUnlockFromSaved()) return; showLock(); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', start); else start();
   window.__leptoToken={ verifyToken, showLock, afterUnlock };
 })();
