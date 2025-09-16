@@ -782,9 +782,14 @@ updateOnset(); updateDefinisiBadge(); ensureUUIDs(); renderTable(); renderCounts
   }
   function autoUnlockFromURL(){
     try{
-      const sp=new URLSearchParams(location.search);
-      const t=sp.get('token'); const skip=sp.get('skipToken')==='1';
-      if(skip || t===ACCESS_TOKEN){ try{ localStorage.setItem(OK_KEY,'1'); }catch(_){ } afterUnlock(); return true; }
+      const sp = new URLSearchParams(location.search);
+      const urlTok = sp.get('token');
+      if(urlTok && urlTok.trim() === ACCESS_TOKEN){
+        try{ localStorage.setItem('lepto_token', ACCESS_TOKEN); }catch(_){}
+        try{ localStorage.setItem('lepto_token_ok','1'); }catch(_){}
+        afterUnlock();
+        return true;
+      }
     }catch(_){}
     return false;
   }
