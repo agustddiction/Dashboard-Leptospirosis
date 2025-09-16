@@ -704,7 +704,68 @@ function renderChoropleth(geojson){
   addCenterLabels();
 }
 function fitIndonesia(){ if(geojsonLayer){ window._leaf_map.fitBounds(geojsonLayer.getBounds(),{padding:[10,10]}); } }
-function exportPNG(){ if(!window._leaf_map){ alert('Peta belum dirender.'); return; } leafletImage(window._leaf_map,(err,canvas)=>{ if(err){ alert('Gagal membuat gambar: '+err); return; } const a=document.createElement('a'); a.download='choropleth.png'; a.href=canvas.toDataURL('image/png'); a.click(); }); }
+
+function exportPNG(){
+  if(!window._leaf_map){ alert('Peta belum ditampilkan.'); return; }
+  const map = window._leaf_map;
+
+  const attemptLeafletImage = () => {
+    try{
+      leafletImage(map, function(err, canvas){
+        if(err || !canvas){ return fallbackHtml2Canvas(); }
+        try{
+          const ctx = canvas.getContext('2d');
+          const img = ctx.getImageData(0,0,canvas.width,canvas.height).data;
+          let hasPixel = false;
+          for(let i=3;i<img.length;i+=4){ if(img[i] !== 0){ hasPixel = true; break; } }
+          if(!hasPixel){ return fallbackHtml2Canvas(); }
+          const a = document.createElement('a');
+          a.download = `peta-leptospirosis-${new Date().toISOString().slice(0,10)}.png`;
+          a.href = canvas.toDataURL('image/png');
+          a.click();
+        }catch(e){
+          return fallbackHtml2Canvas();
+        }
+      });
+    }catch(e){
+      return fallbackHtml2Canvas();
+    }
+  };
+
+  if(typeof map.whenReady === 'function'){
+    map.whenReady(() => {
+      if(map._tilesToLoad && map._tilesToLoad > 0){
+        map.once('idle', attemptLeafletImage);
+      }else{
+        attemptLeafletImage();
+      }
+    });
+  }else{
+    attemptLeafletImage();
+  }
+
+  function fallbackHtml2Canvas(){
+    const target = document.getElementById('map') || map.getContainer();
+    if(typeof html2canvas === 'undefined'){
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+      s.onload = () => doHtml2Canvas(target);
+      s.onerror = () => alert('Gagal mengekspor PNG. Coba lagi setelah peta tampil sepenuhnya.');
+      document.head.appendChild(s);
+    }else{
+      doHtml2Canvas(target);
+    }
+  }
+  function doHtml2Canvas(el){
+    html2canvas(el, {useCORS:true, backgroundColor:null, scale:2}).then(canvas => {
+      const a = document.createElement('a');
+      a.download = `peta-leptospirosis-${new Date().toISOString().slice(0,10)}.png`;
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+    }).catch(()=> alert('Gagal mengekspor PNG.'));
+  }
+}
+
 function recalcCasesByProvinceFromLocal(){ const arr=loadCases(); const counts={}; arr.forEach(d=>{ const p=d.prov||'(Tidak diisi)'; counts[p]=(counts[p]||0)+1; }); return counts; }
 function recalcCasesFromLocalAndRefresh(){ const counts=recalcCasesByProvinceFromLocal(); if(Object.keys(counts).length){ casesByProvince=counts; refreshChoropleth(); } }
 document.getElementById('recalcMap')?.addEventListener('click', ()=>recalcCasesFromLocalAndRefresh());
@@ -968,6 +1029,7 @@ updateOnset(); updateDefinisiBadge(); ensureUUIDs(); renderTable(); renderCounts
 // TOKEN
 (function(){
   const OK_KEY = 'lepto_token_ok';
+  function hasOk(){ try{ return localStorage.getItem(OK_KEY)==='1'; }catch(_){ return false; } }
   let unlocked=false;
   function hideLock(){ const el=document.getElementById('lock'); if(el){ el.remove(); document.body.classList.remove('locked'); } }
   function showLock(){
@@ -1014,7 +1076,7 @@ updateOnset(); updateDefinisiBadge(); ensureUUIDs(); renderTable(); renderCounts
     }catch(_){}
     return false;
   }
-  function start(){ if(autoUnlockFromURL()) return; showLock(); }
+  function start(){ if(hasOk()){ afterUnlock(); return; } if(autoUnlockFromURL()) return; showLock(); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', start); else start();
   window.__leptoToken={ verifyToken, showLock, afterUnlock };
 })();

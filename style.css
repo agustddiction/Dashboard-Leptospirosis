@@ -111,3 +111,17 @@ body.locked{ overflow:hidden }
 /* Ensure month range label sits clearly above inputs */
 #monthRangeWrap > label{ display:block; margin-bottom:6px }
 #monthRangeWrap .range-inline{ margin-top:0 }
+
+
+/* Sticky header for cases table */
+#casesTable thead th {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 5;
+}
+
+
+/* Sticky header on scroll */
+header{ position: sticky; top: 0; z-index: 999; background: var(--bg, #ffffff); }
+header .container, header .wrap{ position: relative; }
