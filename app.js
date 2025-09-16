@@ -5,7 +5,6 @@
   const $  = (id) => document.getElementById(id);
   const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
-  // ======= Data Master =======
   const GEJALA = [
     {id:'demam', label:'Demam'},
     {id:'nyeri_otot', label:'Nyeri otot'},
@@ -28,7 +27,6 @@
     'Hobi/olahraga air (berenang, memancing)'
   ];
 
-  // ===== Utilities =====
   function fmtDate(d){
     if(!d) return '';
     if(typeof d === 'string') return d.slice(0,10);
@@ -36,16 +34,13 @@
   }
   function genUUID(){ return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0,v=c==='x'?r:(r&0x3|0x8);return v.toString(16);}); }
 
-  // ===== Storage =====
   const LS_KEY = 'lepto_cases';
   function loadCases(){ try{ const raw=localStorage.getItem(LS_KEY); const arr=raw?JSON.parse(raw):[]; return Array.isArray(arr)?arr:[]; }catch(_){ return []; } }
   function saveCases(arr){ try{ localStorage.setItem(LS_KEY, JSON.stringify(arr||[])); }catch(_){} }
 
-  // ===== State =====
   let CASES = loadCases();
   window.__CASES__ = CASES;
 
-  // ===== UI Builders: Gejala & Paparan =====
   function renderGejalaPaparan(){
     const gWrap = $('gejalaGrid');
     if (gWrap && !gWrap.dataset.built){
@@ -75,21 +70,16 @@
     }
   }
 
-  // ===== Definisi Kasus (otomatis) =====
   function getRadio(n){ const el = document.querySelector(`input[name="${n}"]:checked`); return el?el.value:''; }
   function computeDefinisi(){
     const S = {};
     GEJALA.forEach(g => { S[g.id] = !!$('g_'+g.id)?.checked; });
     const anyExposure = PAPARAN.some((_, idx) => !!$('p_'+idx)?.checked);
-
-    // Lab groups - deteksi nama yang dipakai di HTML (rdt/mat/pcr)
     const labPCR = getRadio('pcr') || getRadio('lab_pcr');
     const labMAT = getRadio('mat') || getRadio('lab_mat');
     const labRDT = getRadio('rdt') || getRadio('lab_rdt');
-
     const mayor = ['demam','nyeri_otot','kuning','muntah','konjungtivitis','nyeri_kepala'];
     const mayorCount = mayor.reduce((a,k)=> a + (S[k]?1:0), 0);
-
     let status = 'Suspek';
     if (labPCR === 'pos' || labMAT === 'pos') status = 'Terkonfirmasi';
     else if (labRDT === 'pos' || (mayorCount>=3 && anyExposure)) status = 'Probabel';
@@ -105,21 +95,18 @@
       el.className = 'tag ' + (st==='Terkonfirmasi'?'ok': st==='Probabel'?'warn' : st==='Suspek'?'muted':'bad');
     }
   }
-
-  // ===== Onset otomatis (sederhana) =====
   function updateOnsetTag(){
-    // Pakai tanggal manual jika ada, else kosong (karena tidak ada tanggal per gejala)
     const manual = $('onsetManual')?.value || '';
     $('onsetTag') && ($('onsetTag').textContent = manual || '—');
   }
-
-  function onAnyInputChanged(){
-    updateDefBadge();
-    updateOnsetTag();
-    refreshCharts();
+  
+  function updateOnsetVisibility(){
+    const any = Array.from(document.querySelectorAll('#gejalaGrid input[type=checkbox]')).some(x=>x.checked);
+    const wrap = document.getElementById('manualOnsetWrap');
+    if (wrap){ wrap.classList.toggle('hidden', !any); }
   }
+  function onAnyInputChanged(){ updateDefBadge(); updateOnsetTag(); updateOnsetVisibility(); refreshCharts(); drawChoropleth(); }
 
-  // ===== Simpan data (minimal, mengikuti id di HTML) =====
   function getFormData(){
     return {
       uuid: genUUID(),
@@ -145,145 +132,174 @@
     alert('Kasus disimpan.');
   }
 
-  // ===== Filters =====
-  function collectOptionsFromSelect(selId){
-    const sel = $(selId); if(!sel) return [];
-    return Array.from(sel.options).map(o=>o.value).filter(Boolean);
-  }
   function buildFilterOptions(){
-    // Gunakan opsi yang ada di form input jika tersedia
-    const provs = collectOptionsFromSelect('prov');
+    const provs = Array.from(document.getElementById('prov')?.options||[]).map(o=>o.value).filter(Boolean);
     const fProv = $('fProv'); if (fProv && fProv.options.length<=1 && provs.length){
       fProv.innerHTML = '<option value="">Semua</option>' + provs.map(p=>`<option>${p}</option>`).join('');
     }
-    // kab akan tergantung prov terpilih; dibiarkan saat ini.
   }
-  function applyFilters(){
-    refreshAll();
-  }
+  function applyFilters(){ refreshAll(); }
 
-  // ===== Charts (Chart.js) =====
   let trendChart, kabChart;
-  function computeFiltered(){
-    // Placeholder sederhana: saat ini belum menerapkan filter kompleks -> kembalikan semua
-    return loadCases();
-  }
+  function computeFiltered(){ return loadCases(); }
   function refreshCharts(){
     const data = computeFiltered();
-    // By month (YYYY-MM from tanggal_onset)
     const byMonth = {};
-    data.forEach(it=>{
-      const m = (it.tanggal_onset || '').slice(0,7) || '—';
-      byMonth[m] = (byMonth[m]||0)+1;
-    });
-    const months = Object.keys(byMonth).sort();
-    const mVals = months.map(k=>byMonth[k]);
-
-    const ctx1 = $('trendChart')?.getContext?.('2d');
+    data.forEach(it=>{ const m=(it.tanggal_onset||'').slice(0,7)||'—'; byMonth[m]=(byMonth[m]||0)+1; });
+    const months=Object.keys(byMonth).sort(); const mVals=months.map(k=>byMonth[k]);
+    const ctx1 = document.getElementById('trendChart')?.getContext?.('2d');
     if (ctx1){
-      if (trendChart) { trendChart.destroy(); }
-      trendChart = new Chart(ctx1, {
-        type: 'line',
-        data: { labels: months, datasets: [{ label: 'Kasus per Bulan', data: mVals }] },
-        options: { responsive: true, maintainAspectRatio: false }
-      });
+      if (trendChart) trendChart.destroy();
+      trendChart = new Chart(ctx1, { type:'line', data:{ labels:months, datasets:[{ label:'Kasus per Bulan', data:mVals }] }, options:{ responsive:true, maintainAspectRatio:false }});
     }
-
-    // By kabupaten
-    const byKab = {};
-    data.forEach(it=>{
-      const k = it.kabupaten || '—';
-      byKab[k] = (byKab[k]||0)+1;
-    });
-    const kabKeys = Object.keys(byKab).sort((a,b)=>byKab[b]-byKab[a]).slice(0,12);
-    const kabVals = kabKeys.map(k=>byKab[k]);
-    const ctx2 = $('kabChart')?.getContext?.('2d');
+    const byKab = {}; data.forEach(it=>{ const k=it.kabupaten||'—'; byKab[k]=(byKab[k]||0)+1; });
+    const kabKeys=Object.keys(byKab).sort((a,b)=>byKab[b]-byKab[a]).slice(0,12); const kabVals=kabKeys.map(k=>byKab[k]);
+    const ctx2 = document.getElementById('kabChart')?.getContext?.('2d');
     if (ctx2){
-      if (kabChart) { kabChart.destroy(); }
-      kabChart = new Chart(ctx2, {
-        type: 'bar',
-        data: { labels: kabKeys, datasets: [{ label: 'Top Kabupaten', data: kabVals }] },
-        options: { responsive: true, maintainAspectRatio: false }
-      });
+      if (kabChart) kabChart.destroy();
+      kabChart = new Chart(ctx2, { type:'bar', data:{ labels:kabKeys, datasets:[{ label:'Top Kabupaten', data:kabVals }] }, options:{ responsive:true, maintainAspectRatio:false }});
     }
   }
 
-  // ===== Map (Leaflet) =====
-  let map;
-  function initMap(){
-    const mapDiv = $('map');
-    if (!mapDiv) return;
-    if (map) { map.invalidateSize(); return; }
-    map = L.map(mapDiv).setView([-2.5, 118], 4); // Indonesia view
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 18, attribution: '&copy; OpenStreetMap'
-    }).addTo(map);
-    drawMarkers();
-  }
-  function drawMarkers(){
-    if (!map) return;
-    // Remove old layers except tile
-    map.eachLayer(l=>{ if(!(l instanceof L.TileLayer)) { try{ map.removeLayer(l);}catch(_){}} });
-    const data = computeFiltered();
-    const pts = [];
-    data.forEach(it=>{
-      if (it.lat && it.lng){
-        const m = L.marker([it.lat, it.lng]).addTo(map);
-        m.bindPopup(`<b>${it.nama||'Kasus'}</b><br>${it.kabupaten||''}, ${it.provinsi||''}<br>${it.tanggal_onset||''}`);
-        pts.push([it.lat, it.lng]);
-      }
-    });
-    const msg = $('mapMsg');
-    if (pts.length){
-      const bounds = L.latLngBounds(pts);
-      try{ map.fitBounds(bounds.pad(0.15)); }catch(_){}
-      if (msg) msg.textContent = '';
-    } else {
-      if (msg) msg.textContent = 'Belum ada titik koordinat pada data kasus.';
-    }
+  catch(_){}} });
+    const data = computeFiltered(); const pts=[];
+    data.forEach(it=>{ if(it.lat && it.lng){ const m=L.marker([it.lat,it.lng]).addTo(map); m.bindPopup(`<b>${it.nama||'Kasus'}</b><br>${it.kabupaten||''}, ${it.provinsi||''}<br>${it.tanggal_onset||''}`); pts.push([it.lat,it.lng]); } });
+    const msg=document.getElementById('mapMsg');
+    if (pts.length){ const b=L.latLngBounds(pts); try{ map.fitBounds(b.pad(0.15)); }catch(_){} if(msg) msg.textContent=''; }
+    else { if(msg) msg.textContent='Belum ada titik koordinat pada data kasus.'; }
   }
 
-  // ===== Refresh helpers =====
-  function refreshAll(){
-    buildFilterOptions();
-    updateDefBadge();
-    updateOnsetTag();
-    refreshCharts();
-    initMap();
-    drawMarkers();
+  function _syncTimeModeUI(){
+    const mode = (document.getElementById('fTimeMode')?.value)||'month';
+    const m = document.getElementById('monthRangeWrap');
+    const y = document.getElementById('yearRangeWrap');
+    if (mode === 'month'){ m?.classList.remove('inactive'); y?.classList.add('inactive'); }
+    else { y?.classList.remove('inactive'); m?.classList.add('inactive'); }
   }
 
-  // ===== Wire & Boot =====
+  function refreshAll(){ buildFilterOptions(); updateDefBadge(); updateOnsetTag(); updateOnsetVisibility(); refreshCharts(); drawChoropleth(); initMap(); drawMarkers(); }
+
   function wire(){
-    $('simpan')?.addEventListener('click', (e)=>{ e.preventDefault(); handleSubmit(); });
-    $('btnFilter')?.addEventListener('click', (e)=>{ e.preventDefault(); applyFilters(); });
-    $('recalcMap')?.addEventListener('click', (e)=>{ e.preventDefault(); drawMarkers(); });
-
-    // Any input changes trigger recompute
+    document.getElementById('simpan')?.addEventListener('click', (e)=>{ e.preventDefault(); handleSubmit(); });
+    document.getElementById('applyFilter')?.addEventListener('click', (e)=>{ e.preventDefault(); applyFilters(); });
+    document.getElementById('recalcMap')?.addEventListener('click', (e)=>{ e.preventDefault(); drawMarkers(); });
+    document.getElementById('fTimeMode')?.addEventListener('change', _syncTimeModeUI);
+    
+    // bind lab radios for instant definisi
+    ;['pcr','lab_pcr','mat','lab_mat','rdt','lab_rdt'].forEach(name=>{
+      document.querySelectorAll(`input[name="${name}"]`).forEach(el=>{
+        el.addEventListener('change', ()=>{ updateDefBadge(); });
+      });
+    });
     ['input','change'].forEach(evt => {
       document.addEventListener(evt, (e)=>{
         const id = (e.target && e.target.id) || '';
-        if (id.startsWith('g_') || id.startsWith('p_') || ['onsetManual'].includes(id)) {
-          onAnyInputChanged();
-        }
+        if (id.startsWith('g_') || id.startsWith('p_') || ['onsetManual'].includes(id)) onAnyInputChanged();
       }, true);
     });
   }
 
-  function boot(){
-    renderGejalaPaparan();
-    wire();
-    refreshAll();
+  
+  // ===== Choropleth Map (Provinsi) =====
+  let map, provLayer, legendCtrl, compassCtrl;
+  const RAW_PROV_URL = 'https://raw.githubusercontent.com/agustddiction/Dashboard-Leptospirosis/main/provinsi.json';
+
+  function getCasesByProv(){
+    const data = computeFiltered();
+    const agg = {};
+    data.forEach(it => {
+      const p = (it.provinsi||it.prov||'').trim();
+      if(!p) return;
+      agg[p] = (agg[p]||0)+1;
+    });
+    return agg;
+  }
+  function colorScale(v, max){
+    const t = max ? (v/max) : 0;
+    const stops = ['#ffffff','#e0f2f1','#b2dfdb','#80cbc4','#26a69a','#00897b'];
+    const idx = Math.min(5, Math.floor(t*5));
+    return stops[idx];
+  }
+  function buildLegend(max){
+    const div = L.DomUtil.create('div','leaflet-legend');
+    div.innerHTML = '<div><b>Kasus / Provinsi</b></div>';
+    const scale = L.DomUtil.create('div','scale', div);
+    [0,1,2,3,4,5].forEach(i=>{
+      const box = L.DomUtil.create('div','box', scale);
+      box.style.background = colorScale(i,5);
+    });
+    const lbl = L.DomUtil.create('div','muted', div);
+    lbl.innerHTML = '<span>rendah</span> &nbsp;&nbsp; <span style="float:right">tinggi</span>';
+    return div;
+  }
+  function makeCompass(){
+    return L.Control.extend({
+      onAdd: function(){
+        const div = L.DomUtil.create('div','leaflet-control compass');
+        div.innerHTML = 'N ↑';
+        return div;
+      },
+      onRemove: function(){}
+    });
+  }
+  async function loadProvGeo(){
+    try{
+      const r = await fetch(RAW_PROV_URL, {cache:'no-store'});
+      if (!r.ok) throw new Error('fetch failed');
+      return await r.json();
+    }catch(e){
+      console.warn('Prov geo load failed', e);
+      return null;
+    }
+  }
+  async function initMap(){
+    const mapDiv = document.getElementById('map'); if (!mapDiv) return;
+    if (!map){
+      map = L.map(mapDiv, { zoomControl: true, preferCanvas: true }).setView([-2.5,118], 4);
+      L.tileLayer('', { attribution:'' }).addTo(map);
+      const C = makeCompass(); compassCtrl = new C({ position:'topright' }).addTo(map);
+      legendCtrl = L.control({position:'bottomright'}); legendCtrl.onAdd = function(){ return buildLegend(5); }; legendCtrl.addTo(map);
+    }
+    if (!provLayer){
+      const gj = await loadProvGeo();
+      if (gj && gj.type){
+        provLayer = L.geoJSON(gj, {
+          style: f => ({ color:'#cbd5e1', weight:1, fillOpacity:.9, fillColor:'#fff' }),
+          onEachFeature: (f, layer) => {
+            const name = (f.properties?.Propinsi || f.properties?.provinsi || f.properties?.name || '').trim();
+            layer.bindTooltip(name || 'Provinsi', {sticky:true});
+          }
+        }).addTo(map);
+      }
+    }
+    drawChoropleth();
+  }
+  function drawChoropleth(){
+    if (!map || !provLayer) return;
+    const agg = getCasesByProv();
+    const max = Math.max(1, ...Object.values(agg).map(x=>x||0));
+    provLayer.eachLayer(layer => {
+      const name = (layer.feature?.properties?.Propinsi || layer.feature?.properties?.provinsi || layer.feature?.properties?.name || '').trim();
+      const v = agg[name] || 0;
+      layer.setStyle({ fillColor: colorScale(v, max) });
+      const html = `<b>${name||'Provinsi'}</b><br>Kasus: ${v}`;
+      layer.bindPopup(html);
+    });
+  }
+  function exportMapPng(){
+    if (!map) return alert('Peta belum siap');
+    if (typeof leafletImage !== 'function') { alert('leaflet-image tidak tersedia'); return; }
+    leafletImage(map, function(err, canvas){
+      if (err || !canvas){ alert('Gagal render peta'); return; }
+      const w = canvas.width, h = canvas.height;
+      const out = document.createElement('canvas'); out.width = w; out.height = h;
+      const ctx = out.getContext('2d'); ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,w,h); ctx.drawImage(canvas, 0, 0);
+      const link = document.createElement('a'); link.download = 'peta-leptospirosis.png'; link.href = out.toDataURL('image/png'); link.click();
+    });
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-  else boot();
+  function boot(){ renderGejalaPaparan(); wire(); refreshAll(); _syncTimeModeUI(); updateOnsetVisibility(); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 
-  // Exports for gate
-  window.renderTable = function(){}; // not used by this layout
-  window.renderCounts = function(){};
-  window.updateCharts = refreshCharts;
-  window.recalcCasesFromLocalAndRefresh = refreshAll;
-  window.initMap = initMap;
-  window.scheduleAutoPull = function(){};
+  window.renderTable=function(){}; window.renderCounts=function(){}; window.updateCharts=refreshCharts; window.recalcCasesFromLocalAndRefresh=refreshAll; window.initMap=initMap; window.scheduleAutoPull=function(){};
 })();
