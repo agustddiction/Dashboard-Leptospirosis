@@ -54,8 +54,9 @@ textarea{ min-height:70px; resize:vertical }
 .sticky-filters{ position:sticky; top:64px; z-index:10; background:#fff; border:1px solid var(--line); border-radius:12px; padding:10px; }
 .filters-grid{
   display:grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr)); /* 4 kolom proporsional */
-  gap:10px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-auto-flow: row dense;
+  gap:12px;
   align-items:end;
 }
 .filters-grid .span2{ grid-column: span 2; }

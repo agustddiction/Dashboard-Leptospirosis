@@ -370,10 +370,7 @@ function renderTable(){
   });
 }
 
-document.getElementById('simpan').addEventListener('click', e=>{
-  e.preventDefault();
-  const data=getFormData();
-  if(!data.nama){ alert('Nama wajib diisi.'); return; }
+\1data.definisi = computeDefinisi(); data.savedAt = new Date().toISOString(); if(!data.nama){ alert('Nama wajib diisi.'); return; }
   if(!data.prov||!data.kab){ alert('Provinsi dan Kabupaten/Kota wajib dipilih.'); return; }
   const arr=loadCases(); if(editingIndex>=0){ arr[editingIndex]=data; saveCases(arr); cancelEdit(); } else { arr.push(data); saveCases(arr); }
   renderTable(); renderCounts(); updateCharts(); recalcCasesFromLocalAndRefresh();
@@ -414,7 +411,7 @@ function yearKey(dateStr){ return dateStr ? dateStr.slice(0,4) : ''; }
 function withinRangeMonth(dateStr,start,end){ const m=monthKey(dateStr); if(!m) return false; if(start&&m<start) return false; if(end&&m>end) return false; return true; }
 function withinRangeYear(dateStr,ys,ye){ const y=yearKey(dateStr); if(!y) return false; if(ys&&y<ys) return false; if(ye&&y>ye) return false; return true; }
 function updateCharts(){
-  const arr=loadCases();
+  const arr=(loadCases()||[]).filter(isMeaningfulCase);
   const fp=fProv.value||""; const fk=fKab.value||"";
   const mode=fTimeMode.value||'month';
   const ms=fStart.value||""; const me=fEnd.value||"";
@@ -526,41 +523,53 @@ function parseGVizJSON(text){
   const rows=(table.rows||[]).map(r=>(r.c||[]).map(c=>c?(c.v??''):''));
   return rows.map(vals=>{ const o={}; headers.forEach((h,i)=>o[h]=vals[i]); return o; });
 }
+
+function normKey(k){
+  return String(k||'').toLowerCase().replace(/[^a-z0-9]+/g,'').trim();
+}
+function pick(row, names){
+  // Build normalized map once
+  const map = {}; Object.keys(row||{}).forEach(k=> map[normKey(k)] = row[k]);
+  for(const name of names){
+    const v = map[normKey(name)];
+    if(v!==undefined && v!==null && (String(v).trim().length>0)) return v;
+  }
+  return '';
+}
 function flatToCase(r){
   return {
-    uuid: r['UUID']||'',
-    nama: r['Nama']||'',
-    jk: r['Jenis Kelamin']||'',
-    umur: r['Umur']||'',
-    kerja: r['Pekerjaan']||'',
-    prov: r['Provinsi']||'',
-    kab: r['Kab/Kota']||'',
-    alamat: r['Alamat']||'',
-    onset: r['Onset']||'',
-    tglPaparan: r['Tanggal Paparan']||'',
+    uuid: pick(r, ['UUID','Uid','Id','ID','uuid']),
+    nama: pick(r, ['Nama','Name','Nama Pasien','Nama Lengkap']),
+    jk: pick(r, ['Jenis Kelamin','JK','Gender']),
+    umur: pick(r, ['Umur','Usia','Age']),
+    kerja: pick(r, ['Pekerjaan','Profesi']),
+    prov: pick(r, ['Provinsi','Prov']),
+    kab:  pick(r, ['Kab/Kota','Kabupaten/Kota','Kabupaten','Kota','KabKota']),
+    alamat: pick(r, ['Alamat','Alamat Lengkap']),
+    onset: pick(r, ['Onset','Tanggal Onset','Tgl Onset','Tanggal Mulai Gejala']),
+    tglPaparan: pick(r, ['Tanggal Paparan','Tgl Paparan']),
     gejala: {}, gejalaTgl: {},
     paparan: [],
     lab: {
-      leukosit: r['Leukosit (x10^3/µL)']||'',
-      trombosit: r['Trombosit (x10^3/µL)']||'',
-      bilirubin: r['Bilirubin (mg/dL)']||'',
-      sgot: r['SGOT (U/L)']||'',
-      sgpt: r['SGPT (U/L)']||'',
-      kreatinin: r['Kreatinin (mg/dL)']||'',
-      amilase: r['Amilase (U/L)']||'',
-      cpk: r['CPK (U/L)']||'',
-      proteinuria: (r['Proteinuria']||'')==='Ya',
-      hematuria: (r['Hematuria']||'')==='Ya',
-      rdt: ((r['RDT']||'').toLowerCase().startsWith('pos')?'pos':((r['RDT']||'').toLowerCase().startsWith('neg')?'neg':'nd')),
-      mat: ((r['MAT']||'').toLowerCase().startsWith('pos')?'pos':((r['MAT']||'').toLowerCase().startsWith('neg')?'neg':'nd')),
-      pcr: ((r['PCR']||'').toLowerCase().startsWith('pos')?'pos':((r['PCR']||'').toLowerCase().startsWith('neg')?'neg':'nd')),
-      serovar: r['Serovar']||''
+      leukosit: pick(r, ['Leukosit (x10^3/µL)','Leukosit']),
+      trombosit: pick(r, ['Trombosit (x10^3/µL)','Trombosit']),
+      bilirubin: pick(r, ['Bilirubin (mg/dL)','Bilirubin']),
+      sgot: pick(r, ['SGOT (U/L)','SGOT']),
+      sgpt: pick(r, ['SGPT (U/L)','SGPT']),
+      kreatinin: pick(r, ['Kreatinin (mg/dL)','Kreatinin']),
+      rdt: (String(pick(r,['RDT'])).toLowerCase().startsWith('pos')?'pos':(String(pick(r,['RDT'])).toLowerCase().startsWith('neg')?'neg':'nd')),
+      mat: (String(pick(r,['MAT'])).toLowerCase().startsWith('pos')?'pos':(String(pick(r,['MAT'])).toLowerCase().startsWith('neg')?'neg':'nd')),
+      pcr: (String(pick(r,['PCR'])).toLowerCase().startsWith('pos')?'pos':(String(pick(r,['PCR'])).toLowerCase().startsWith('neg')?'neg':'nd')),
+      serovar: pick(r, ['Serovar']),
+      amilase: pick(r, ['Amilase (U/L)','Amilase']),
+      cpk: pick(r, ['CPK (U/L)','CPK']),
+      proteinuria: /ya/i.test(String(pick(r, ['Proteinuria']))),
+      hematuria: /ya/i.test(String(pick(r, ['Hematuria']))),
     },
-    definisi: r['Definisi']||'',
-    statusAkhir: r['Status Akhir']||'',
-    tglStatus: r['Tanggal Status']||'',
-    obat: r['Obat']||'',
-    savedAt: r['Saved At']||new Date().toISOString()
+    statusAkhir: pick(r, ['Status Akhir','Status']),
+    tglStatus: pick(r, ['Tanggal Status','Tgl Status','Tgl Update']),
+    obat: pick(r, ['Obat']),
+    savedAt: pick(r, ['Saved At','SavedAt','Timestamp','Created At','Created'])
   };
 }
 function getKey(d){ return (d && d.uuid) ? ('uuid:'+d.uuid) : ('dup:'+([ (d.nama||'').trim().toLowerCase(), (d.umur||'')+'', (d.alamat||'').trim().toLowerCase(), d.onset||'' ].join('|'))); }
