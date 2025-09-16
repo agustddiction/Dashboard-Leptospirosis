@@ -103,7 +103,8 @@
   function updateOnsetVisibility(){
     const any = Array.from(document.querySelectorAll('#gejalaGrid input[type=checkbox]')).some(x=>x.checked);
     const wrap = document.getElementById('manualOnsetWrap');
-    if (wrap){ wrap.classList.toggle('hidden', !(!any) ? true : false); } // hide when any checked; show only when none
+    if (wrap){ wrap.classList.toggle('hidden', !any ? true : false); } // show only when any checked
+  } // hide when any checked; show only when none
   }
   }
   function onAnyInputChanged(){ updateDefBadge(); updateOnsetTag(); updateOnsetVisibility(); refreshCharts(); drawChoropleth(); }
@@ -325,7 +326,7 @@ const data = computeFiltered(); const pts=[];
     });
   }
 
-  function boot(){ renderGejalaPaparan(); wire(); refreshAll(); _syncTimeModeUI(); updateOnsetVisibility(); }
+  function boot(){ renderGejalaPaparan(); updateOnsetVisibility();  renderGejalaPaparan(); wire(); refreshAll(); _syncTimeModeUI(); updateOnsetVisibility(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 
   window.renderTable=function(){}; window.renderCounts=function(){}; window.updateCharts=refreshCharts; window.recalcCasesFromLocalAndRefresh=refreshAll; window.initMap=initMap; window.scheduleAutoPull=function(){};
