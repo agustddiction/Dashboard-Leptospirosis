@@ -55,19 +55,19 @@ function _bindHeaderShadow(){
   window.addEventListener('scroll', onscroll, {passive:true}); onscroll();
 }
 function _syncTimeModeUI(){
-  const mode=(document.getElementById('fTimeMode')?.value)||'month';
+  const mode=(document.getElementById('fTimeMode'(())&&().value)))||'month';
   const mWrap=document.getElementById('monthRangeWrap');
   const yWrap=document.getElementById('yearRangeWrap');
   if(mode==='month'){
-    mWrap?.classList.remove('inactive');
-    yWrap?.classList.remove('active');
-    yWrap?.classList.add('inactive');
+    ((mWrap)&&(mWrap.classList)).remove('inactive');
+    ((yWrap)&&(yWrap.classList)).remove('active');
+    ((yWrap)&&(yWrap.classList)).add('inactive');
   }else{
-    yWrap?.classList.add('active');
-    mWrap?.classList.add('inactive');
+    ((yWrap)&&(yWrap.classList)).add('active');
+    ((mWrap)&&(mWrap.classList)).add('inactive');
   }
 }
-document.getElementById('fTimeMode')?.addEventListener('change', _syncTimeModeUI);
+document.getElementById('fTimeMode'(())&&().addEventListener))('change', _syncTimeModeUI);
 
 function initProvKab(){
   const provs=Object.keys(PROV_KAB).sort();
@@ -141,11 +141,11 @@ function getOnsetDate(){
   return earliest;
 }
 function updateOnset(){ const onset=getOnsetDate(); document.getElementById('onsetTag').textContent = onset ? onset.toISOString().slice(0,10) : "—"; }
-function getRadio(name){ return (document.querySelector('input[name="'+name+'"]:checked')?.value)||''; }
+function getRadio(name){ return (document.querySelector('input[name="'+name+'"]:checked'(())&&().value)))||''; }
 
 function computeDefinisi(){
-  const S={}; GEJALA.forEach(g=>{ S[g.id]=document.getElementById('g_'+g.id)?.checked; });
-  const anyExposure = PAPARAN.some((_,idx)=> document.getElementById('p_'+idx)?.checked );
+  const S={}; GEJALA.forEach(g=>{ S[g.id]=document.getElementById('g_'+g.((id))&&(id).checked)); });
+  const anyExposure = PAPARAN.some((_,idx)=> document.getElementById('p_'+((idx))&&(idx).checked)) );
   const leuk=parseFloat(document.getElementById('leukosit').value);
   const trom=parseFloat(document.getElementById('trombosit').value);
   const bili=parseFloat(document.getElementById('bilirubin').value);
@@ -252,7 +252,7 @@ function getFormData(){
   const gejala={}; const gejalaTgl={};
   GEJALA.forEach(g=>{ gejala[g.label]=document.getElementById('g_'+g.id).checked; gejalaTgl[g.label]=(document.getElementById('d_'+g.id).value||""); });
   const paparan=PAPARAN.map((p,idx)=>({label:p,checked:document.getElementById('p_'+idx).checked}));
-  const currUuid = (editingIndex>=0 ? (loadCases()[editingIndex]?.uuid) : null) || editingUUID || genUUID();
+  const currUuid = (editingIndex>=0 ? (loadCases()[((editingIndex])&&(editingIndex].uuid))) : null) || editingUUID || genUUID();
   return {
     uuid: currUuid,
     nama:document.getElementById('nama').value,
@@ -437,9 +437,9 @@ let geojsonLayer; let _labels=[]; window._leaf_map = null;
 function ensureMap(){ if(window._leaf_map) return window._leaf_map; window._leaf_map=L.map('map',{zoomControl:true,attributionControl:false}); window.addEventListener('resize', ()=>{ try{ window._leaf_map.invalidateSize(); }catch(_){}}); return window._leaf_map; }
 let casesByProvince={"Aceh":12,"Sumatera Utara":28,"Sumatera Barat":8,"Riau":15,"Jambi":5,"Sumatera Selatan":31,"Bengkulu":2,"Lampung":44,"Kepulauan Bangka Belitung":1,"Kepulauan Riau":3,"DKI Jakarta":320,"Jawa Barat":188,"Jawa Tengah":96,"DI Yogyakarta":45,"Jawa Timur":210,"Banten":74,"Bali":12,"Nusa Tenggara Barat":9,"Nusa Tenggara Timur":20,"Kalimantan Barat":6,"Kalimantan Tengah":4,"Kalimantan Selatan":11,"Kalimantan Timur":7,"Kalimantan Utara":1,"Sulawesi Utara":5,"Sulawesi Tengah":6,"Sulawesi Selatan":130,"Sulawesi Tenggara":4,"Gorontalo":1,"Sulawesi Barat":2,"Maluku":1,"Maluku Utara":1,"Papua Barat":1,"Papua":2,"Papua Selatan":0,"Papua Tengah":0,"Papua Pegunungan":0};
 function totalNational(){ return Object.values(casesByProvince).reduce((a,b)=>a+(+b||0),0); }
-function getProvName(props){ return props?.provinsi||props?.Provinsi||props?.PROVINSI||props?.NAME_1||props?.Name||props?.WADMPR||props?.wadmpr||props?.WADMPRV||props?.nama||props?.name||''; }
+function getProvName(props){ return ((props)&&(props.provinsi))||((props)&&(props.Provinsi))||((props)&&(props.PROVINSI))||((props)&&(props.NAME_1))||((props)&&(props.Name))||((props)&&(props.WADMPR))||((props)&&(props.wadmpr))||((props)&&(props.WADMPRV))||((props)&&(props.nama))||((props)&&(props.name))||''; }
 function styleFeature(feat){ const prov=getProvName(feat.properties||{}); const val=+casesByProvince[prov]||0; return {weight:1,color:'#9ca3af',fillColor:getColor(val),fillOpacity:0.8}; }
-function highlightFeature(e){ e.target.setStyle({weight:2,fillOpacity:0.9,color:'#6b7280'}); e.target.bringToFront?.(); }
+function highlightFeature(e){ e.target.setStyle({weight:2,fillOpacity:0.9,color:'#6b7280'}); if(e.target && typeof e.target.bringToFront==='function') e.target.bringToFront(); }
 function resetHighlight(e){ geojsonLayer && geojsonLayer.resetStyle(e.target); }
 function onEachFeature(feature, layer){
   const prov=getProvName(feature.properties||{}); const val=+casesByProvince[prov]||0;
@@ -452,7 +452,7 @@ function addCenterLabels(){
   if(!window._leaf_map||!geojsonLayer) return;
   _labels.forEach(l=>window._leaf_map.removeLayer(l)); _labels=[];
   geojsonLayer.eachLayer(layer=>{
-    const prov=getProvName(layer.feature?.properties||{}); const val=+casesByProvince[prov]||0;
+    const prov=getProvName(layer.((feature)&&(feature.properties))||{}); const val=+casesByProvince[prov]||0;
     if(val>0){ const c=layer.getBounds().getCenter(); const t=L.tooltip({permanent:true,direction:'center',className:'prov-label'}).setContent(String(val)).setLatLng(c); _labels.push(t); t.addTo(window._leaf_map); }
   });
 }
@@ -481,8 +481,8 @@ function fitIndonesia(){ if(geojsonLayer){ window._leaf_map.fitBounds(geojsonLay
 function exportPNG(){ if(!window._leaf_map){ alert('Peta belum dirender.'); return; } leafletImage(window._leaf_map,(err,canvas)=>{ if(err){ alert('Gagal membuat gambar: '+err); return; } const a=document.createElement('a'); a.download='choropleth.png'; a.href=canvas.toDataURL('image/png'); a.click(); }); }
 function recalcCasesByProvinceFromLocal(){ const arr=loadCases(); const counts={}; arr.forEach(d=>{ const p=d.prov||'(Tidak diisi)'; counts[p]=(counts[p]||0)+1; }); return counts; }
 function recalcCasesFromLocalAndRefresh(){ const counts=recalcCasesByProvinceFromLocal(); if(Object.keys(counts).length){ casesByProvince=counts; refreshChoropleth(); } }
-document.getElementById('recalcMap')?.addEventListener('click', ()=>recalcCasesFromLocalAndRefresh());
-document.getElementById('exportPng')?.addEventListener('click', exportPNG);
+(function(){ var __el=document.getElementById('recalcMap'); if(__el) __el.addEventListener('click', ()=>recalcCasesFromLocalAndRefresh());
+(function(){ var __el=document.getElementById('exportPng'); if(__el) __el.addEventListener('click', exportPNG);
 async function initMap(){
   ensureMap();
   try{
@@ -624,7 +624,7 @@ async function pullFromSheets(opts={merge:true, silent:false}){
     if(!opts.silent) alert('Gagal menarik data dari Google Sheet. Pastikan Sheet di-publish ke web.');
   }
 }
-document.getElementById('pullSheets')?.addEventListener('click', ()=>pullFromSheets({merge:true, silent:false}));
+(function(){ var __el=document.getElementById('pullSheets'); if(__el) __el.addEventListener('click', ()=>pullFromSheets({merge:true, silent:false}));
 
 async function sendRowToSheets(row){
   if(!SHEETS_URL){ console.warn('SHEETS_URL kosong'); return; }
@@ -681,7 +681,7 @@ async function sendAllToSheets(){
     alert('Permintaan sync dikirim: '+toSend.length+' baris baru.');
   }catch(e){ alert('Gagal sync: '+e); }
 }
-document.getElementById('syncSheets')?.addEventListener('click', sendAllToSheets);
+(function(){ var __el=document.getElementById('syncSheets'); if(__el) __el.addEventListener('click', sendAllToSheets);
 
 async function sendReplaceAllToSheets(){
   if(!SHEETS_URL){ alert('SHEETS_URL belum diisi.'); return; }
@@ -714,7 +714,7 @@ async function sendReplaceAllToSheets(){
     alert('Gagal Full Sync: '+e);
   }
 }
-document.getElementById('fullSyncSheets')?.addEventListener('click', sendReplaceAllToSheets);
+(function(){ var __el=document.getElementById('fullSyncSheets'); if(__el) __el.addEventListener('click', sendReplaceAllToSheets);
 
 // Jadwal auto-pull setelah login
 let _autoTimer = null;
@@ -741,7 +741,7 @@ async function scheduleAutoPull(){
     el.classList.remove('hidden');
     document.body.classList.add('locked');
     bindHandlers();
-    setTimeout(()=>document.getElementById('tokenInput')?.focus(), 50);
+    setTimeout(()=>(function(){var __el=document.getElementById('tokenInput'); if(__el) __el.focus(); })(), 50);
   }
   function bindHandlers(){
     const btn=document.getElementById('unlockBtn');
@@ -760,13 +760,13 @@ async function scheduleAutoPull(){
     try{ recalcCasesFromLocalAndRefresh(); }catch(_){}
     setTimeout(()=>{
       try{ initMap(); }catch(_){}
-      try{ trendChart?.resize(); kabChart?.resize(); }catch(_){}
-      setTimeout(()=>{ if(window._leaf_map){ try{ window._leaf_map.invalidateSize(); fitIndonesia(); }catch(_){} } },200);
+      try{ (function(){try{ if(typeof trendChart!=='undefined' && trendChart) trendChart.resize(); }catch(_){} })(); (function(){try{ if(typeof kabChart!=='undefined' && kabChart) kabChart.resize(); }catch(_){} })(); }catch(_){}
+      setTimeout(()=>{ if(window._leaf_map){ try{ if(window._leaf_map) window._leaf_map.invalidateSize(); fitIndonesia(); }catch(_){} } },200);
       try{ scheduleAutoPull(); }catch(_){}
     },100);
   }
   function verifyToken(){
-    const val=(document.getElementById('tokenInput')?.value||'').trim();
+    const val=(document.getElementById('tokenInput'(())&&().value))||'').trim();
     const err=document.getElementById('lockErr');
     if(val===ACCESS_TOKEN){
       try{ localStorage.setItem(OK_KEY,'1'); localStorage.setItem('lepto_token', val); }catch(_){}
