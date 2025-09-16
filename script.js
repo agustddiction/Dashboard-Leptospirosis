@@ -462,55 +462,66 @@ function defClass(def){
 }
 
 function renderTable(){
-  const tbody=document.querySelector('#casesTable tbody'); 
-  tbody.innerHTML='';
-  const data=loadCases();
-  
-  data.forEach((d,i)=>{
-    const tr=document.createElement('tr');
-    tr.innerHTML=`
-      <td title="${d.uuid||''}">${d.nama}</td>
-      <td>${d.umur}</td>
-      <td>${d.prov}</td>
-      <td>${d.kab}</td>
-      <td>${d.onset||'-'}</td>
-      <td><span class="tag ${defClass(d.definisi)}">${d.definisi}</span></td>
-      <td>${d.statusAkhir||'-'}</td>
-      <td>
-        <button class="btn small" data-edit="${i}">Edit</button> 
-        <button class="btn small" data-del="${i}">Hapus</button>
-      </td>`;
-    tbody.appendChild(tr);
-  });
-  
-  tbody.querySelectorAll('button[data-edit]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{ 
-      const i=+btn.dataset.edit; 
-      const arr=loadCases(); 
-      editingIndex=i; 
-      loadCaseIntoForm(arr[i]); 
+const tbody=document.querySelector('#casesTable tbody'); 
+tbody.innerHTML='';
+// Filter: remove rows that are effectively empty (no Nama & no Prov/Kab)
+const data=loadCases().filter(d => {
+  const hasIdentity = (d.nama && d.nama.trim()) || (d.prov && d.prov.trim()) || (d.kab && d.kab.trim());
+  return !!hasIdentity;
+});
+
+const safe = v => (v===undefined || v===null || (typeof v==='string' && v.trim()==='')) ? '—' : v;
+
+data.forEach((d,i)=>{
+  const tr=document.createElement('tr');
+  tr.innerHTML=`
+    <td title="${safe(d.uuid||'')}">${safe(d.nama)}</td>
+    <td>${safe(d.umur)}</td>
+    <td>${safe(d.prov)}</td>
+    <td>${safe(d.kab)}</td>
+    <td>${safe(d.onset||'-')}</td>
+    <td><span class="tag ${defClass(d.definisi)}">${safe(d.definisi)}</span></td>
+    <td>${safe(d.statusAkhir||'-')}</td>
+    <td>
+      <button class="btn small" data-edit="${i}">Edit</button> 
+      <button class="btn small" data-del="${i}">Hapus</button>
+    </td>`;
+  tbody.appendChild(tr);
+});
+
+tbody.querySelectorAll('button[data-edit]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{ 
+    const i=+btn.dataset.edit; 
+    const arr=loadCases().filter(d => {
+      const hasIdentity = (d.nama && d.nama.trim()) || (d.prov && d.prov.trim()) || (d.kab && d.kab.trim());
+      return !!hasIdentity;
     });
+    editingIndex=i; 
+    loadCaseIntoForm(arr[i]); 
   });
-  
-  tbody.querySelectorAll('button[data-del]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{ 
-      const i=+btn.dataset.del; 
-      if (!confirm('Yakin ingin menghapus kasus ini?')) return;
-      
-      const arr=loadCases(); 
-      arr.splice(i,1); 
-      saveCases(arr); 
-      renderTable(); 
-      renderCounts(); 
-      updateCharts(); 
-      recalcCasesFromLocalAndRefresh();
-      
-      // Trigger sync after deletion
-      if (AUTO_SYNC_ENABLED && syncStatus.isOnline) {
-        setTimeout(performAutoSync, 1000);
-      }
+});
+
+tbody.querySelectorAll('button[data-del]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{ 
+    const i=+btn.dataset.del; 
+    if (!confirm('Yakin ingin menghapus kasus ini?')) return;
+
+    const all=loadCases().filter(d => {
+      const hasIdentity = (d.nama && d.nama.trim()) || (d.prov && d.prov.trim()) || (d.kab && d.kab.trim());
+      return !!hasIdentity;
     });
+    all.splice(i,1); 
+    saveCases(all); 
+    renderTable(); 
+    renderCounts(); 
+    updateCharts(); 
+    recalcCasesFromLocalAndRefresh();
+
+    if (AUTO_SYNC_ENABLED && syncStatus.isOnline) {
+      setTimeout(performAutoSync, 1000);
+    }
   });
+});
 }
 
 // =====================
@@ -693,7 +704,19 @@ function renderChoropleth(geojson){
   addCenterLabels();
 }
 function fitIndonesia(){ if(geojsonLayer){ window._leaf_map.fitBounds(geojsonLayer.getBounds(),{padding:[10,10]}); } }
-function exportPNG(){ if(!window._leaf_map){ alert('Peta belum dirender.'); return; } leafletImage(window._leaf_map,(err,canvas)=>{ if(err){ alert('Gagal membuat gambar: '+err); return; } const a=document.createElement('a'); a.download='choropleth.png'; a.href=canvas.toDataURL('image/png'); a.click(); }); }
+function exportPNG(){
+  if(!window._leaf_map){ alert('Peta belum dirender.'); return; }
+  try{ window._leaf_map.invalidateSize(); }catch(_){}
+  setTimeout(()=>{
+    leafletImage(window._leaf_map,(err,canvas)=>{
+      if(err){ alert('Gagal membuat gambar: '+err); return; }
+      const a=document.createElement('a');
+      a.download='peta_kasus_leptospirosis.png';
+      a.href=canvas.toDataURL('image/png');
+      a.click();
+    });
+  }, 150);
+} leafletImage(window._leaf_map,(err,canvas)=>{ if(err){ alert('Gagal membuat gambar: '+err); return; } const a=document.createElement('a'); a.download='choropleth.png'; a.href=canvas.toDataURL('image/png'); a.click(); }); }
 function recalcCasesByProvinceFromLocal(){ const arr=loadCases(); const counts={}; arr.forEach(d=>{ const p=d.prov||'(Tidak diisi)'; counts[p]=(counts[p]||0)+1; }); return counts; }
 function recalcCasesFromLocalAndRefresh(){ const counts=recalcCasesByProvinceFromLocal(); if(Object.keys(counts).length){ casesByProvince=counts; refreshChoropleth(); } }
 document.getElementById('recalcMap')?.addEventListener('click', ()=>recalcCasesFromLocalAndRefresh());

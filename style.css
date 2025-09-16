@@ -106,3 +106,11 @@ body.locked{ overflow:hidden }
 
 .hr{ height:1px; background:var(--line); margin:10px 0 }
 .footnote{ color:var(--muted); font-size:12px; margin-top:8px }
+
+
+/* Ensure "Rentang Bulan/Tahun" label sits above inputs cleanly */
+#monthRangeWrap label, #yearRangeWrap label { display:block; margin-bottom:6px }
+#monthRangeWrap .range-inline, #yearRangeWrap .range-inline { display:flex; gap:8px; align-items:center }
+@media (max-width:720px){
+  #monthRangeWrap .range-inline, #yearRangeWrap .range-inline { flex-wrap:wrap }
+}
