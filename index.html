@@ -3,13 +3,10 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Dashboard Leptospirosis</title>
+<title>Dashboard Leptospirosis — Pencatatan Kasus</title>
 <link rel="stylesheet" href="./style.css" />
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-image@latest/leaflet-image.js"></script>
-</head>
+<!-- Chart.js & XLSX --><script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<!-- Leaflet CSS & JS (CDN) --></head>
 <body>
   <!-- TOKEN OVERLAY -->
   <div id="lock" class="lock">
@@ -26,7 +23,8 @@
 
   <header class="app-header"><div class="app-header-inner">
     <div class="wrap" style="position:relative">
-      <h1>Dashboard Leptospirosis</h1>
+      <h1>Dashboard Pencatatan Kasus Leptospirosis</h1>
+      <div class="sub">Tema monokrom • Satu kolom memanjang • Data tersimpan lokal (browser)</div>
       
     </div>
   <div class="badge neutral" id="defBadge">Definisi Kasus: —</div></div></header>
@@ -334,5 +332,56 @@
   </main>
 
 <script defer src="./script.js"></script>
+
+<!-- ===== Library Loader with Fallbacks ===== -->
+<script>
+(function(){
+  function loadScript(urls, done){
+    if (!urls || !urls.length) return done && done(new Error('All sources failed'));
+    var src = urls.shift();
+    var s = document.createElement('script');
+    s.src = src; s.async = false;
+    s.onload = function(){ done && done(null, src); };
+    s.onerror = function(){ loadScript(urls, done); };
+    document.body.appendChild(s);
+  }
+  function loadCSS(hrefs){
+    (hrefs||[]).forEach(function(h){
+      var l = document.createElement('link');
+      l.rel = 'stylesheet'; l.href = h; l.crossOrigin = '';
+      document.head.appendChild(l);
+    });
+  }
+
+  // Leaflet CSS (we can include multiple; browser picks what loads)
+  loadCSS([
+    'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
+    'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css',
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css'
+  ]);
+
+  // Chart.js UMD
+  loadScript([
+    'https://cdn.jsdelivr.net/npm/chart.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js',
+    'https://unpkg.com/chart.js@4.4.0/dist/chart.umd.js'
+  ], function(){});
+
+  // Leaflet JS
+  loadScript([
+    'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+    'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js'
+  ], function(){});
+
+  // Leaflet-Image
+  loadScript([
+    'https://unpkg.com/leaflet-image@latest/leaflet-image.js',
+    'https://cdn.jsdelivr.net/npm/leaflet-image@latest/leaflet-image.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet-image/0.4.0/leaflet-image.js'
+  ], function(){});
+})();
+</script>
+
 </body>
 </html>

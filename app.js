@@ -103,7 +103,8 @@
   function updateOnsetVisibility(){
     const any = Array.from(document.querySelectorAll('#gejalaGrid input[type=checkbox]')).some(x=>x.checked);
     const wrap = document.getElementById('manualOnsetWrap');
-    if (wrap){ wrap.classList.toggle('hidden', !any); }
+    if (wrap){ wrap.classList.toggle('hidden', !(!any) ? true : false); } // hide when any checked; show only when none
+  }
   }
   function onAnyInputChanged(){ updateDefBadge(); updateOnsetTag(); updateOnsetVisibility(); refreshCharts(); drawChoropleth(); }
 
@@ -142,6 +143,34 @@
 
   let trendChart, kabChart;
   function computeFiltered(){ return loadCases(); }
+  
+  function renderTable(){
+    const tbody = document.querySelector('#casesTable tbody');
+    if (!tbody) return;
+    const rows = computeFiltered();
+    tbody.innerHTML = rows.map(it => {
+      const onset = (it.tanggal_onset||'').slice(0,10);
+      const def = it.definisi || '';
+      const st = it.status || '';
+      return `<tr>
+        <td>${it.nama||''}</td>
+        <td>${it.umur||''}</td>
+        <td>${it.provinsi||''}</td>
+        <td>${it.kabupaten||''}</td>
+        <td>${onset||''}</td>
+        <td>${def||''}</td>
+        <td>${st||''}</td>
+        <td><button class="btn small" data-uuid="${it.uuid||''}">Detail</button></td>
+      </tr>`;
+    }).join('');
+    // counts
+    const counts = document.getElementById('counts');
+    if (counts){
+      counts.textContent = `Total kasus: ${rows.length}`;
+    }
+  }
+
+
   function refreshCharts(){
     const data = computeFiltered();
     const byMonth = {};
@@ -160,9 +189,7 @@
       kabChart = new Chart(ctx2, { type:'bar', data:{ labels:kabKeys, datasets:[{ label:'Top Kabupaten', data:kabVals }] }, options:{ responsive:true, maintainAspectRatio:false }});
     }
   }
-
-  catch(_){}} });
-    const data = computeFiltered(); const pts=[];
+const data = computeFiltered(); const pts=[];
     data.forEach(it=>{ if(it.lat && it.lng){ const m=L.marker([it.lat,it.lng]).addTo(map); m.bindPopup(`<b>${it.nama||'Kasus'}</b><br>${it.kabupaten||''}, ${it.provinsi||''}<br>${it.tanggal_onset||''}`); pts.push([it.lat,it.lng]); } });
     const msg=document.getElementById('mapMsg');
     if (pts.length){ const b=L.latLngBounds(pts); try{ map.fitBounds(b.pad(0.15)); }catch(_){} if(msg) msg.textContent=''; }
@@ -177,12 +204,12 @@
     else { y?.classList.remove('inactive'); m?.classList.add('inactive'); }
   }
 
-  function refreshAll(){ buildFilterOptions(); updateDefBadge(); updateOnsetTag(); updateOnsetVisibility(); refreshCharts(); drawChoropleth(); initMap(); drawMarkers(); }
+  function refreshAll(){ buildFilterOptions(); updateDefBadge(); updateOnsetTag(); updateOnsetVisibility(); renderTable(); refreshCharts(); initMap(); drawChoropleth(); }
 
   function wire(){
     document.getElementById('simpan')?.addEventListener('click', (e)=>{ e.preventDefault(); handleSubmit(); });
     document.getElementById('applyFilter')?.addEventListener('click', (e)=>{ e.preventDefault(); applyFilters(); });
-    document.getElementById('recalcMap')?.addEventListener('click', (e)=>{ e.preventDefault(); drawMarkers(); });
+    document.getElementById('recalcMap')?.addEventListener('click', (e)=>{ e.preventDefault(); drawChoropleth(); });
     document.getElementById('fTimeMode')?.addEventListener('change', _syncTimeModeUI);
     
     // bind lab radios for instant definisi

@@ -174,3 +174,10 @@ header.app-header{ position: sticky; top: 0; z-index: 1000; background: #fff; }
 .leaflet-legend .scale{ display:flex; gap:4px; margin-top:6px; }
 .leaflet-legend .box{ width:16px; height:10px; border-radius:2px; border:1px solid rgba(0,0,0,.06); }
 .leaflet-control.compass{ background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:6px 8px; font:12px/1 system-ui; }
+
+
+/* === Override: badge placement & sticky header === */
+header, header.app-header{ position:sticky; top:0; z-index:1000; }
+.app-header-inner{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+#defBadge{ position:static !important; transform:none !important; margin-left:auto; }
+
