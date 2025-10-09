@@ -147,7 +147,7 @@ function normalizeString(str) {
   if (!str) return '';
   return str.toString().trim().toLowerCase()
     .replace(/\s+/g, ' ')
-    .replace(/[^\w\s]/g, ''); // Remove special characters
+    .replace(/[^\w\s]/g, '');
 }
 
 function generateDuplicateKey(data) {
@@ -182,12 +182,388 @@ function loadCases() {
   }
 }
 
-function \1calculateAndRenderCFR(); if (AUTO_SYNC_ENABLED && syncStatus.isOnline) {
-        setTimeout(scheduleAutoPull, 1000);
-      }
+function saveCases(arr) {
+  try {
+    localStorage.setItem('lepto_cases', JSON.stringify(arr));
+    return true;
+  } catch (e) {
+    console.error('Error saving cases:', e);
+    alert('Gagal menyimpan data. Mungkin storage penuh.');
+    return false;
+  }
+}
+
+function calculateCFR(cases) {
+  const meninggal = cases.filter(d => d.statusAkhir === 'Meninggal').length;
+  const total = cases.length;
+  return total > 0 ? ((meninggal / total) * 100).toFixed(2) : '0.00';
+}
+
+function renderCounts() {
+  const arr = loadCases();
+  const el = document.getElementById('counts');
+  const cfrEl = document.getElementById('cfrDisplay');
+  if (el) {
+    el.textContent = `Total: ${arr.length} kasus`;
+  }
+  if (cfrEl) {
+    const cfr = calculateCFR(arr);
+    cfrEl.textContent = `CFR: ${cfr}%`;
+    cfrEl.className = 'tag';
+    if (parseFloat(cfr) > 10) cfrEl.classList.add('bad');
+    else if (parseFloat(cfr) > 5) cfrEl.classList.add('warn');
+    else cfrEl.classList.add('ok');
+  }
+}
+
+function renderTable() {
+  const arr = loadCases();
+  const tbody = document.querySelector('#casesTable tbody');
+  if (!tbody) return;
+  
+  tbody.innerHTML = '';
+  arr.forEach((d, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${d.nama || '-'}</td>
+      <td>${d.umur || '-'}</td>
+      <td>${d.jk || '-'}</td>
+      <td>${d.onset || '-'}</td>
+      <td>${d.statusAkhir || '-'}</td>
+      <td><span class="tag ${d.definisi === 'Konfirmasi' ? 'ok' : (d.definisi === 'Probable' ? 'warn' : 'bad')}">${d.definisi || '-'}</span></td>
+      <td>
+        <button class="btn small" onclick="editCase(${i})">Edit</button>
+        <button class="btn small danger" onclick="deleteCase(${i})">Hapus</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function getFormData() {
+  const gejala = {};
+  const gejalaTgl = {};
+  GEJALA.forEach(g => {
+    const cb = document.getElementById(g.id);
+    const dt = document.getElementById(g.id + 'Tgl');
+    gejala[g.label] = cb ? cb.checked : false;
+    gejalaTgl[g.label] = (dt && cb && cb.checked) ? dt.value : '';
+  });
+
+  const paparan = PAPARAN.map(label => {
+    const cb = document.getElementById('pap_' + label.replace(/[^a-zA-Z0-9]/g, '_'));
+    return { label, checked: cb ? cb.checked : false };
+  });
+
+  const getRdVal = name => {
+    const sel = document.querySelector(`input[name="${name}"]:checked`);
+    return sel ? sel.value : 'nd';
+  };
+
+  const onset = calculateOnset(gejalaTgl);
+
+  const data = {
+    uuid: editingUUID || genUUID(),
+    nama: document.getElementById('nama').value.trim(),
+    jk: document.getElementById('jk').value,
+    umur: document.getElementById('umur').value,
+    kerja: document.getElementById('kerja').value.trim(),
+    prov: document.getElementById('prov').value,
+    kab: document.getElementById('kab').value,
+    alamat: document.getElementById('alamat').value.trim(),
+    onset,
+    gejala,
+    gejalaTgl,
+    paparan,
+    lab: {
+      leukosit: document.getElementById('leukosit').value,
+      trombosit: document.getElementById('trombosit').value,
+      bilirubin: document.getElementById('bilirubin').value,
+      sgot: document.getElementById('sgot').value,
+      sgpt: document.getElementById('sgpt').value,
+      kreatinin: document.getElementById('kreatinin').value,
+      rdt: getRdVal('rdt'),
+      mat: getRdVal('mat'),
+      serovar: document.getElementById('serovar').value.trim(),
+      amilase: document.getElementById('amilase').value,
+      cpk: document.getElementById('cpk').value,
+      pcr: getRdVal('pcr'),
+      proteinuria: document.getElementById('proteinuria').checked,
+      hematuria: document.getElementById('hematuria').checked,
+    },
+    definisi: calculateDefinisi(gejala, paparan, {
+      leukosit: document.getElementById('leukosit').value,
+      trombosit: document.getElementById('trombosit').value,
+      bilirubin: document.getElementById('bilirubin').value,
+      rdt: getRdVal('rdt'),
+      mat: getRdVal('mat'),
+    }),
+    statusAkhir: document.getElementById('statusAkhir').value,
+    tglStatus: document.getElementById('tglStatus').value,
+    obat: document.getElementById('obat').value.trim(),
+    savedAt: new Date().toISOString()
+  };
+
+  return data;
+}
+
+function calculateOnset(gejalaTgl) {
+  const dates = Object.values(gejalaTgl).filter(d => d);
+  if (dates.length === 0) {
+    const manual = document.getElementById('onsetManual').value;
+    return manual || '';
+  }
+  return dates.sort()[0];
+}
+
+function calculateDefinisi(gejala, paparan, lab) {
+  const hasSymptoms = Object.values(gejala).some(v => v);
+  const hasExposure = paparan.some(p => p.checked);
+  const rdtPos = lab.rdt === 'pos';
+  const matPos = lab.mat === 'pos';
+  
+  if (matPos) return 'Konfirmasi';
+  if (rdtPos && hasSymptoms && hasExposure) return 'Probable';
+  if (hasSymptoms && hasExposure) return 'Suspek';
+  return 'Tidak terdefinisi';
+}
+
+function updateDefinisiBadge() {
+  const gejala = {};
+  GEJALA.forEach(g => {
+    const cb = document.getElementById(g.id);
+    gejala[g.label] = cb ? cb.checked : false;
+  });
+
+  const paparan = PAPARAN.map(label => {
+    const cb = document.getElementById('pap_' + label.replace(/[^a-zA-Z0-9]/g, '_'));
+    return { label, checked: cb ? cb.checked : false };
+  });
+
+  const getRdVal = name => {
+    const sel = document.querySelector(`input[name="${name}"]:checked`);
+    return sel ? sel.value : 'nd';
+  };
+
+  const def = calculateDefinisi(gejala, paparan, {
+    leukosit: document.getElementById('leukosit').value,
+    trombosit: document.getElementById('trombosit').value,
+    bilirubin: document.getElementById('bilirubin').value,
+    rdt: getRdVal('rdt'),
+    mat: getRdVal('mat'),
+  });
+
+  const badge = document.getElementById('defBadge');
+  if (badge) {
+    badge.textContent = `Definisi Kasus: ${def}`;
+    badge.className = 'badge';
+    if (def === 'Konfirmasi') badge.classList.add('ok');
+    else if (def === 'Probable') badge.classList.add('warn');
+    else if (def === 'Suspek') badge.classList.add('neutral');
+    else badge.classList.add('bad');
+  }
+}
+
+function buildGejalaGrid() {
+  const grid = document.getElementById('gejalaGrid');
+  if (!grid) return;
+  
+  grid.innerHTML = '';
+  GEJALA.forEach(g => {
+    const div = document.createElement('div');
+    div.className = 'symptom';
+    div.innerHTML = `
+      <input type="checkbox" id="${g.id}"/>
+      <label for="${g.id}" style="margin:0; flex:1">${g.label}</label>
+      <input id="${g.id}Tgl" type="date" style="width:140px"/>
+    `;
+    grid.appendChild(div);
+    
+    const cb = div.querySelector('input[type="checkbox"]');
+    const dt = div.querySelector('input[type="date"]');
+    cb.addEventListener('change', () => {
+      dt.disabled = !cb.checked;
+      if (!cb.checked) dt.value = '';
+      updateOnsetTag();
+      updateDefinisiBadge();
+    });
+    dt.addEventListener('change', updateOnsetTag);
+    dt.disabled = true;
+  });
+}
+
+function buildPaparanGrid() {
+  const grid = document.getElementById('paparanGrid');
+  if (!grid) return;
+  
+  grid.innerHTML = '';
+  PAPARAN.forEach(label => {
+    const id = 'pap_' + label.replace(/[^a-zA-Z0-9]/g, '_');
+    const div = document.createElement('div');
+    div.className = 'symptom';
+    div.innerHTML = `
+      <input type="checkbox" id="${id}"/>
+      <label for="${id}" style="margin:0">${label}</label>
+    `;
+    grid.appendChild(div);
+    
+    const cb = div.querySelector('input[type="checkbox"]');
+    cb.addEventListener('change', updateDefinisiBadge);
+  });
+}
+
+function bindRapidRadioUpdates() {
+  ['rdt', 'mat', 'pcr'].forEach(name => {
+    document.querySelectorAll(`input[name="${name}"]`).forEach(rd => {
+      rd.addEventListener('change', updateDefinisiBadge);
     });
   });
 }
+
+function updateOnsetTag() {
+  const gejalaTgl = {};
+  GEJALA.forEach(g => {
+    const cb = document.getElementById(g.id);
+    const dt = document.getElementById(g.id + 'Tgl');
+    gejalaTgl[g.label] = (dt && cb && cb.checked) ? dt.value : '';
+  });
+  
+  const onset = calculateOnset(gejalaTgl);
+  const tag = document.getElementById('onsetTag');
+  if (tag) {
+    tag.textContent = onset || '—';
+  }
+}
+
+function resetForm() {
+  document.getElementById('nama').value = '';
+  document.getElementById('jk').value = '';
+  document.getElementById('umur').value = '';
+  document.getElementById('kerja').value = '';
+  document.getElementById('prov').value = '';
+  document.getElementById('kab').value = '';
+  document.getElementById('alamat').value = '';
+  
+  GEJALA.forEach(g => {
+    const cb = document.getElementById(g.id);
+    const dt = document.getElementById(g.id + 'Tgl');
+    if (cb) cb.checked = false;
+    if (dt) { dt.value = ''; dt.disabled = true; }
+  });
+  
+  document.getElementById('onsetManual').value = '';
+  
+  PAPARAN.forEach(label => {
+    const cb = document.getElementById('pap_' + label.replace(/[^a-zA-Z0-9]/g, '_'));
+    if (cb) cb.checked = false;
+  });
+  
+  ['leukosit', 'trombosit', 'bilirubin', 'sgot', 'sgpt', 'kreatinin', 'serovar', 'amilase', 'cpk'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  
+  ['rdt', 'mat', 'pcr'].forEach(name => {
+    document.querySelectorAll(`input[name="${name}"]`).forEach(rd => rd.checked = false);
+  });
+  
+  document.getElementById('proteinuria').checked = false;
+  document.getElementById('hematuria').checked = false;
+  document.getElementById('statusAkhir').value = '';
+  document.getElementById('tglStatus').value = '';
+  document.getElementById('obat').value = '';
+  
+  editingIndex = -1;
+  editingUUID = null;
+  document.body.classList.remove('editing');
+  updateOnsetTag();
+  updateDefinisiBadge();
+}
+
+function cancelEdit() {
+  resetForm();
+}
+
+window.editCase = function(index) {
+  const arr = loadCases();
+  const d = arr[index];
+  if (!d) return;
+  
+  editingIndex = index;
+  editingUUID = d.uuid;
+  document.body.classList.add('editing');
+  
+  document.getElementById('nama').value = d.nama || '';
+  document.getElementById('jk').value = d.jk || '';
+  document.getElementById('umur').value = d.umur || '';
+  document.getElementById('kerja').value = d.kerja || '';
+  document.getElementById('prov').value = d.prov || '';
+  
+  setTimeout(() => {
+    document.getElementById('kab').value = d.kab || '';
+  }, 100);
+  
+  document.getElementById('alamat').value = d.alamat || '';
+  
+  GEJALA.forEach(g => {
+    const cb = document.getElementById(g.id);
+    const dt = document.getElementById(g.id + 'Tgl');
+    if (cb) cb.checked = d.gejala[g.label] || false;
+    if (dt) {
+      dt.value = d.gejalaTgl[g.label] || '';
+      dt.disabled = !cb.checked;
+    }
+  });
+  
+  (d.paparan || []).forEach(p => {
+    const cb = document.getElementById('pap_' + p.label.replace(/[^a-zA-Z0-9]/g, '_'));
+    if (cb) cb.checked = p.checked || false;
+  });
+  
+  const lab = d.lab || {};
+  document.getElementById('leukosit').value = lab.leukosit || '';
+  document.getElementById('trombosit').value = lab.trombosit || '';
+  document.getElementById('bilirubin').value = lab.bilirubin || '';
+  document.getElementById('sgot').value = lab.sgot || '';
+  document.getElementById('sgpt').value = lab.sgpt || '';
+  document.getElementById('kreatinin').value = lab.kreatinin || '';
+  document.getElementById('serovar').value = lab.serovar || '';
+  document.getElementById('amilase').value = lab.amilase || '';
+  document.getElementById('cpk').value = lab.cpk || '';
+  
+  const setRd = (name, val) => {
+    document.querySelectorAll(`input[name="${name}"]`).forEach(rd => {
+      rd.checked = (rd.value === val);
+    });
+  };
+  setRd('rdt', lab.rdt || 'nd');
+  setRd('mat', lab.mat || 'nd');
+  setRd('pcr', lab.pcr || 'nd');
+  
+  document.getElementById('proteinuria').checked = lab.proteinuria || false;
+  document.getElementById('hematuria').checked = lab.hematuria || false;
+  
+  document.getElementById('statusAkhir').value = d.statusAkhir || '';
+  document.getElementById('tglStatus').value = d.tglStatus || '';
+  document.getElementById('obat').value = d.obat || '';
+  
+  updateOnsetTag();
+  updateDefinisiBadge();
+  
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+window.deleteCase = function(index) {
+  if (!confirm('Hapus kasus ini?')) return;
+  const arr = loadCases();
+  arr.splice(index, 1);
+  if (saveCases(arr)) {
+    renderAll();
+    if (AUTO_SYNC_ENABLED && syncStatus.isOnline) {
+      setTimeout(scheduleAutoPull, 1000);
+    }
+  }
+};
 
 function renderAll(){
     renderTable(); 
@@ -221,7 +597,10 @@ function setupActionButtons() {
         arr.push(data);
       }
       
-      if (\1calculateAndRenderCFR(); alert('Kasus disimpan.');
+      if (saveCases(arr)) {
+        resetForm();
+        renderAll();
+        alert('Kasus disimpan.');
         
         if (AUTO_SYNC_ENABLED && syncStatus.isOnline) {
           setTimeout(scheduleAutoPull, 500);
@@ -252,7 +631,7 @@ function setupActionButtons() {
       const rows=document.querySelectorAll('#casesTable tbody tr');
       rows.forEach((tr,i)=>tr.style.backgroundColor = dups.has(i) ? '#fefce8' : '');
       
-      const message = dups.size ? `${dups.size / 2} pasang duplikat ditemukan & ditandai kuning.` : 'Tidak ada duplikat.';
+      const message = dups.size ? `${Math.floor(dups.size / 2)} pasang duplikat ditemukan & ditandai kuning.` : 'Tidak ada duplikat.';
       alert(message);
     });
 
@@ -276,9 +655,12 @@ function setupActionButtons() {
       }
 
       if (confirm(`Menemukan ${removed} duplikat. Hapus?`)) {
-          \1calculateAndRenderCFR(); alert(`Menghapus ${removed} duplikat.`);
-          if (AUTO_SYNC_ENABLED && syncStatus.isOnline) {
-            setTimeout(scheduleAutoPull, 1000);
+          if (saveCases(result)) {
+            renderAll();
+            alert(`Menghapus ${removed} duplikat.`);
+            if (AUTO_SYNC_ENABLED && syncStatus.isOnline) {
+              setTimeout(scheduleAutoPull, 1000);
+            }
           }
       }
     });
@@ -338,7 +720,7 @@ function updateCharts(){
 
   // Kab/Kota Chart
   const perKab={}; filtered.forEach(d=>{ const kk=d.kab||'(Tidak diisi)'; perKab[kk]=(perKab[kk]||0)+1; });
-  const kLabels=Object.keys(perKab).sort((a, b) => perKab[b] - perKab[a]).slice(0, 15); // Top 15
+  const kLabels=Object.keys(perKab).sort((a, b) => perKab[b] - perKab[a]).slice(0, 15);
   kabChart.data.labels=kLabels; 
   kabChart.data.datasets[0].data=kLabels.map(k=>perKab[k]||0); 
   kabChart.update();
@@ -477,9 +859,7 @@ function flatToCase(r){
     prov: r['Provinsi']||'',
     kab: r['Kab/Kota']||'',
     alamat: r['Alamat']||'',
-    
     onset: r['Onset']||'',
-    
     gejala: {}, gejalaTgl: {}, paparan: [],
     lab: {
       leukosit: r['Leukosit (x10^3/µL)']||'',
@@ -527,24 +907,108 @@ async function pullFromSheets(opts={merge:true, silent:false}){
     return;
   }
   try{
+    updateSyncStatus('Menarik data dari Google Sheets...');
     const remoteCases = await readSheetCases();
     if(opts.merge){
       const local = loadCases();
       const merged = mergeCases(local, remoteCases);
-      \1calculateAndRenderCFR(); bindRapidRadioUpdates(); bindDefinisiRealtime();
-    setupActionButtons(); _bindHeaderShadow();
+      if(saveCases(merged)){
+        renderAll();
+        updateSyncStatus(`Berhasil sync: ${merged.length} kasus`);
+        if(!opts.silent) alert(`Sync selesai: ${merged.length} kasus`);
+      }
+    } else {
+      if(saveCases(remoteCases)){
+        renderAll();
+        updateSyncStatus(`Berhasil tarik: ${remoteCases.length} kasus`);
+        if(!opts.silent) alert(`Tarik selesai: ${remoteCases.length} kasus`);
+      }
+    }
+  }catch(err){
+    updateSyncStatus('Gagal sync: '+err.message, true);
+    if(!opts.silent) alert('Gagal sync dari Sheets: '+err.message);
+  }
+}
 
-    // Map and chart event listeners
+async function sendAllToSheets(replace=false){
+  if(!SHEETS_URL || SHEETS_URL.startsWith('GANTI_')){ alert('SHEETS_URL belum diisi di script.js'); return; }
+  const arr=loadCases(); if(arr.length===0){ alert('Tidak ada data untuk dikirim.'); return; }
+  try{
+    updateSyncStatus('Mengirim data ke Google Sheets...');
+    const rows=arr.map(flattenCase);
+    const res=await fetch(SHEETS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:replace?'replaceAll':'append',data:rows})});
+    const result=await res.json();
+    if(result.status==='success'){
+      updateSyncStatus('Berhasil kirim ke Sheets');
+      alert('Data berhasil dikirim ke Google Sheets');
+    } else {
+      throw new Error(result.message||'Gagal');
+    }
+  }catch(err){
+    updateSyncStatus('Gagal kirim: '+err.message, true);
+    alert('Gagal mengirim ke Sheets: '+err.message);
+  }
+}
+
+async function sendReplaceAllToSheets(){
+  if(!confirm('Ini akan mengganti SEMUA data di Google Sheets dengan data lokal. Lanjutkan?')) return;
+  await sendAllToSheets(true);
+}
+
+// Auto-sync scheduler
+let autoPullTimer = null;
+function scheduleAutoPull() {
+  if (!AUTO_SYNC_ENABLED || !syncStatus.isOnline) return;
+  if (autoPullTimer) clearTimeout(autoPullTimer);
+  
+  autoPullTimer = setTimeout(async () => {
+    if (!syncStatus.isSyncing && syncStatus.isOnline) {
+      syncStatus.isSyncing = true;
+      await pullFromSheets({ merge: true, silent: true });
+      syncStatus.isSyncing = false;
+    }
+    scheduleAutoPull();
+  }, AUTO_SYNC_INTERVAL_MS);
+}
+
+// =====================
+// MAP INITIALIZATION
+// =====================
+async function initMap() {
+  try {
+    const geojson = await loadFromUrl(DEFAULT_GH);
+    renderChoropleth(geojson);
+    recalcCasesFromLocalAndRefresh();
+  } catch (err) {
+    console.error('Failed to load map:', err);
+    document.getElementById('mapMsg').textContent = 'Gagal memuat peta. Periksa koneksi internet.';
+  }
+}
+
+// =====================
+// APP INITIALIZATION
+// =====================
+function initApp() {
+    buildGejalaGrid();
+    buildPaparanGrid();
+    renderAll();
+    _syncTimeModeUI();
+    
+    fTimeMode?.addEventListener('change', _syncTimeModeUI);
+    
+    bindRapidRadioUpdates();
+    bindDefinisiRealtime();
+    setupActionButtons();
+    _bindHeaderShadow();
+
     document.getElementById('applyFilter').addEventListener('click', updateCharts);
     document.getElementById('recalcMap')?.addEventListener('click', recalcCasesFromLocalAndRefresh);
     document.getElementById('exportPng')?.addEventListener('click', exportPNG);
     
-    // Sheets buttons
     document.getElementById('pullSheets')?.addEventListener('click', ()=>pullFromSheets({merge:true, silent:false}));
     document.getElementById('syncSheets')?.addEventListener('click', ()=>sendAllToSheets(false));
     document.getElementById('fullSyncSheets')?.addEventListener('click', sendReplaceAllToSheets);
     
-    // Initialize map and charts
     initMap();
     setTimeout(() => {
         try{ 
@@ -557,10 +1021,12 @@ async function pullFromSheets(opts={merge:true, silent:false}){
         }
     }, 500);
 
-    // Start auto-sync schedule
     scheduleAutoPull();
 }
 
+// =====================
+// TOKEN SYSTEM
+// =====================
 (function(){
   const OK_KEY = 'lepto_token_ok';
   function hasOk(){ try{ return localStorage.getItem(OK_KEY)==='1'; }catch(_){ return false; } }
@@ -647,6 +1113,7 @@ async function pullFromSheets(opts={merge:true, silent:false}){
   
   window.__leptoToken={ verifyToken, showLock, afterUnlock };
 })();
+
 function bindDefinisiRealtime(){
   ['leukosit','trombosit','bilirubin','amilase','cpk'].forEach(id=>{
     const el=document.getElementById(id); if(el){ el.addEventListener('input', updateDefinisiBadge); }
@@ -655,4 +1122,3 @@ function bindDefinisiRealtime(){
     const el=document.getElementById(id); if(el){ el.addEventListener('change', updateDefinisiBadge); }
   });
 }
-
