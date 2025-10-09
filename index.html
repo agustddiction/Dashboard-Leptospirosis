@@ -70,6 +70,10 @@
       </div>
       <label>Alamat Lengkap (RT/RW, Kelurahan, Kecamatan/Dusun/Desa)</label>
       <textarea id="alamat" placeholder="Tulis alamat lengkap..."></textarea>
+       <div style="margin-top:10px">
+          <label>Tanggal Pertama Kali ke Fasyankes</label>
+          <input id="tglFasyankes" type="date"/>
+        </div>
     </section>
 
     <section id="gejala">
@@ -91,7 +95,13 @@
     </section>
 
     <section id="kontak">
-      <h2>Riwayat Paparan Faktor Risiko (2 minggu terakhir)</h2>
+      <h2>Riwayat Kontak</h2>
+      <div class="grid-2">
+        <div>
+          <label>Tanggal Perkiraan Paparan</label>
+          <input id="tglPaparan" type="date"/>
+        </div>
+      </div>
       <label class="muted">Centang faktor risiko dalam 2 minggu terakhir</label>
       <div class="grid-2" id="paparanGrid"></div>
     </section>
@@ -212,7 +222,7 @@
         <button class="btn warning" id="reset">Reset Form</button>
         <span class="right"></span>
         <button class="btn info" id="cekDup">Cek Duplikat</button>
-        <button class="btn danger" id="hapusDup">Hapus Duplikat</button>
+        <button class="btn info" id="hapusDup">Hapus Duplikat</button>
         <button class="btn ok" id="exportExcel">Ekspor Excel</button>
       </div>
     </section>
@@ -273,7 +283,7 @@
 
             <!-- Tombol apply di ujung kanan -->
             <div class="actions">
-              <button class="btn info" id="applyFilter">Terapkan</button>
+              <button class="btn" id="applyFilter">Terapkan</button>
             </div>
           </div>
         </div>

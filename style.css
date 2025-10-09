@@ -10,7 +10,8 @@ body{ margin:0; background:var(--bg); color:var(--fg);
 a{ color:inherit }
 
 /* Sticky header with dynamic shadow */
-header { position: sticky; top: 0; z-index: 1000; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.06); }
+header{ position:sticky; top:0; background:rgba(255,255,255,.96); border-bottom:1px solid var(--line);
+  backdrop-filter:saturate(160%) blur(8px); z-index:20; transition: box-shadow .2s ease }
 header.scrolled{ box-shadow:0 6px 18px rgba(0,0,0,.06) }
 
 .wrap{ max-width:980px; margin:0 auto; padding:14px 18px }
@@ -131,43 +132,6 @@ body.locked{ overflow:hidden }
 
 
 /* Sticky header on scroll */
-header { position: sticky; top: 0; z-index: 1000; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.06); }
+header{ position: sticky; top: 0; z-index: 999; background: var(--bg, #ffffff); }
 header .container, header .wrap{ position: relative; }
 
-
-/* Sticky action bar below header */
-
-/* Sticky filters panel below action bar */
-.sticky-filters { position: sticky; top: 120px; z-index: 10; background: #fff; }
-
-#aksi {
-  position: sticky;
-  bottom: 0;
-  top: auto;
-  z-index: 999;
-  background: #ffffff;
-  border-top: 1px solid var(--line, #e7e7e7);
-  box-shadow: 0 -4px 10px rgba(0,0,0,0.06);
-  padding-top: .5rem;
-  padding-bottom: .5rem;
-}
-
-/* map height */
-#map { min-height: 360px; height: 420px; }
-
-
-/* --- v3: Sticky only for header --- */
-header{
-  position: sticky;
-  top: 0;
-  z-index: 1000;
-  background: #fff;
-  box-shadow: 0 2px 6px rgba(0,0,0,.06);
-}
-#aksi, .sticky-filters, .sticky-footer{
-  position: static !important;
-  top: auto !important;
-  bottom: auto !important;
-  z-index: auto !important;
-  box-shadow: none !important;
-}

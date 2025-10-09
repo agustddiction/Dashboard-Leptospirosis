@@ -44,13 +44,7 @@ const PAPARAN=[
   "Menangani spesimen leptospirosis",
   "Pekerjaan berisiko (drh hewan, RPH, pet shop, petani, pembersih selokan, dll.)",
   "Hobi/olahraga/wisata (berenang, memancing, arung jeram, dll.)",
-  "Sering melihat tikus/tanda keberadaan tikus",
-  "Memiliki hewan peliharaan/ternak di rumah",
-  "Menuju kerja/sekolah melewati genangan air/banjir",
-  "Di tempat kerja/sekolah terdapat tikus atau tanda keberadaan tikus",
-  "Membersihkan got/selokan/kolam tanpa APD",
 ];
-
 
 const prov=document.getElementById('prov'); const kab=document.getElementById('kab');
 const fProv=document.getElementById('fProv'); const fKab=document.getElementById('fKab');
@@ -340,8 +334,12 @@ function getFormData(){
     kerja:document.getElementById('kerja').value,
     prov:document.getElementById('prov').value,
     kab:document.getElementById('kab').value,
-    alamat:document.getElementById('alamat').value,gejala, gejalaTgl,
-    onset: onsetDate ? onsetDate.toISOString().slice(0,10) : "",paparan,
+    alamat:document.getElementById('alamat').value,
+    tglFasyankes: document.getElementById('tglFasyankes').value,
+    gejala, gejalaTgl,
+    onset: onsetDate ? onsetDate.toISOString().slice(0,10) : "",
+    tglPaparan:document.getElementById('tglPaparan').value,
+    paparan,
     lab:{
       leukosit:document.getElementById('leukosit').value,
       trombosit:document.getElementById('trombosit').value,
@@ -375,6 +373,8 @@ function loadCaseIntoForm(d){
   document.getElementById('prov').value = d.prov||''; document.getElementById('prov').dispatchEvent(new Event('change'));
   setTimeout(()=>{ document.getElementById('kab').value = d.kab||''; }, 0);
   document.getElementById('alamat').value = d.alamat||'';
+  document.getElementById('tglFasyankes').value = d.tglFasyankes||'';
+
   initGejalaChecklist();
   Object.entries(d.gejala||{}).forEach(([label,checked])=>{
     const g = GEJALA.find(x => x.label === label);
@@ -699,27 +699,6 @@ function updateCharts(){
 
 
 // =====================
-
-// Initialize map once and load default Indonesia provinces GeoJSON
-let _mapInitialized = false;
-async function initMap(){
-  try{
-    ensureMap();
-    if(!_mapInitialized){
-      try{
-        const geo = await loadFromUrl(DEFAULT_GH);
-        renderChoropleth(geo);
-      }catch(e){
-        console.error('GeoJSON load failed:', e);
-      }
-      _mapInitialized = true;
-    } else {
-      try{ refreshChoropleth(); }catch(_){}
-    }
-  }catch(e){
-    console.error('initMap error:', e);
-  }
-}
 // PETA
 // =====================
 function getColor(val){ const v=Number(val)||0; if(v===0) return '#ffffff'; if(v>0&&v<=50) return '#ffc4c4'; if(v>50&&v<=200) return '#ff7a7a'; return '#cc0000'; }
@@ -787,7 +766,7 @@ function recalcCasesFromLocalAndRefresh(){ const counts=recalcCasesByProvinceFro
 // EKSPOR EXCEL
 // =====================
 function flattenCase(d){
-  const row={ 'UUID':d.uuid||'', 'Nama':d.nama,'Jenis Kelamin':d.jk,'Umur':d.umur,'Pekerjaan':d.kerja,'Provinsi':d.prov,'Kab/Kota':d.kab,'Alamat':d.alamat,'Onset':d.onset,'Definisi':d.definisi,'Status Akhir':d.statusAkhir,'Tanggal Status':d.tglStatus,'Saved At':d.savedAt };
+  const row={ 'UUID':d.uuid||'', 'Nama':d.nama,'Jenis Kelamin':d.jk,'Umur':d.umur,'Pekerjaan':d.kerja,'Provinsi':d.prov,'Kab/Kota':d.kab,'Alamat':d.alamat,'Tgl Fasyankes':d.tglFasyankes,'Onset':d.onset,'Tanggal Paparan':d.tglPaparan,'Definisi':d.definisi,'Status Akhir':d.statusAkhir,'Tanggal Status':d.tglStatus,'Saved At':d.savedAt };
   GEJALA.forEach(g=>{ const label=g.label; row['Gejala: '+label]=d.gejala[label]?'Ya':''; row['Tgl '+label]=d.gejalaTgl[label]||''; });
   row['Paparan (2 minggu)']=(d.paparan||[]).filter(x=>x.checked).map(x=>x.label).join('; ');
   const Lb=d.lab||{}; 
@@ -822,7 +801,11 @@ function flatToCase(r){
     kerja: r['Pekerjaan']||'',
     prov: r['Provinsi']||'',
     kab: r['Kab/Kota']||'',
-    alamat: r['Alamat']||'',onset: r['Onset']||'',gejala: {}, gejalaTgl: {}, paparan: [],
+    alamat: r['Alamat']||'',
+    tglFasyankes: r['Tgl Fasyankes']||'',
+    onset: r['Onset']||'',
+    tglPaparan: r['Tanggal Paparan']||'',
+    gejala: {}, gejalaTgl: {}, paparan: [],
     lab: {
       leukosit: r['Leukosit (x10^3/µL)']||'',
       trombosit: r['Trombosit (x10^3/µL)']||'',
@@ -1120,62 +1103,4 @@ function initApp() {
   }
   
   window.__leptoToken={ verifyToken, showLock, afterUnlock };
-})();
-
-
-// --- Robust initialization on DOM ready ---
-document.addEventListener('DOMContentLoaded', () => {
-  try { if (typeof renderChecklist === 'function') { renderChecklist('paparanGrid', PAPARAN || []); } } catch (e) { console.error('Checklist init failed', e); }
-  try { if (typeof initCharts === 'function') { initCharts(); } else if (typeof updateCharts === 'function') { updateCharts(); } } catch (e) { console.error('Charts init failed', e); }
-  try { if (typeof initMap === 'function') { initMap(); } else if (typeof ensureMap === 'function') { ensureMap(); } } catch (e) { console.error('Map init failed', e); }
-});
-
-
-function initCharts(){
-  try { updateCharts && updateCharts(); } catch(e){ console.warn('updateCharts not defined', e); }
-}
-
-
-// v3 boot: ensure UI pieces render after DOM is ready
-(function(){
-  function safe(fn){ try { fn && fn(); } catch(e){ console.error(e); } }
-  function boot(){
-    // Checklist
-    safe(function(){
-      if (typeof PAPARAN !== 'undefined' && document.getElementById('paparanGrid')){
-        if (!document.querySelector('#paparanGrid input')){
-          if (typeof renderChecklist === 'function'){
-            renderChecklist('paparanGrid', PAPARAN);
-          }
-        }
-      }
-    });
-    // Map
-    safe(function(){
-      if (document.getElementById('map')){
-        if (typeof initMap === 'function'){ initMap(); }
-        setTimeout(function(){
-          try {
-            if (typeof map !== 'undefined' && map && typeof map.invalidateSize === 'function'){
-              map.invalidateSize();
-            }
-          } catch(_){}
-        }, 600);
-      }
-    });
-    // Charts
-    safe(function(){
-      if (typeof renderCharts === 'function'){ renderCharts(); }
-      else {
-        // Fallback: try specific chart renderers if available
-        if (typeof renderGenderChart === 'function') renderGenderChart();
-        if (typeof renderAgeChart === 'function') renderAgeChart();
-      }
-    });
-  }
-  if (document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', boot);
-  } else {
-    boot();
-  }
 })();
