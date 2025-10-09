@@ -35,7 +35,7 @@
     </div>
   </header>
 
-  <main>
+  <main class="form-column">
     <section id="pasien">
       <h2>Data Pasien</h2>
       <div class="grid-2">
@@ -70,21 +70,14 @@
       </div>
       <label>Alamat Lengkap (RT/RW, Kelurahan, Kecamatan/Dusun/Desa)</label>
       <textarea id="alamat" placeholder="Tulis alamat lengkap..."></textarea>
-       <div style="margin-top:10px">
-          <label>Tanggal Pertama Kali ke Fasyankes</label>
-          <input id="tglFasyankes" type="date"/>
-        </div>
-    </section>
+       </section>
 
     <section id="gejala">
       <h2>Riwayat Gejala</h2>
       <div class="muted small">Centang gejala yang muncul. Jika dicentang, isi tanggal munculnya gejala. Onset otomatis diambil dari tanggal gejala paling awal.</div>
       <div class="grid-2" id="gejalaGrid"></div>
       <div id="manualOnsetWrap" class="row hidden" style="margin-top:8px">
-        <div style="min-width:260px">
-          <label>Tanggal gejala (manual)</label>
-          <input id="onsetManual" type="date" />
-          <div class="muted">Gunakan ini hanya jika <b>tidak ada gejala yang dicentang</b>.</div>
+        
         </div>
       </div>
       <div class="hr"></div>
@@ -97,11 +90,7 @@
     <section id="kontak">
       <h2>Riwayat Kontak</h2>
       <div class="grid-2">
-        <div>
-          <label>Tanggal Perkiraan Paparan</label>
-          <input id="tglPaparan" type="date"/>
         </div>
-      </div>
       <label class="muted">Centang faktor risiko dalam 2 minggu terakhir</label>
       <div class="grid-2" id="paparanGrid"></div>
     </section>
@@ -204,10 +193,7 @@
             <option value="Meninggal">Meninggal</option>
           </select>
         </div>
-        <div>
-          <label>Tanggal Status</label>
-          <input id="tglStatus" type="date"/>
-        </div>
+        
         <div>
           <label>Pemberian Obat</label>
           <input id="obat" type="text" placeholder="cth: Doksisiklin, Penicillin, dll."/>
