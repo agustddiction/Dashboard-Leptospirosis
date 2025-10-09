@@ -1121,3 +1121,61 @@ function initApp() {
   
   window.__leptoToken={ verifyToken, showLock, afterUnlock };
 })();
+
+
+// --- Robust initialization on DOM ready ---
+document.addEventListener('DOMContentLoaded', () => {
+  try { if (typeof renderChecklist === 'function') { renderChecklist('paparanGrid', PAPARAN || []); } } catch (e) { console.error('Checklist init failed', e); }
+  try { if (typeof initCharts === 'function') { initCharts(); } else if (typeof updateCharts === 'function') { updateCharts(); } } catch (e) { console.error('Charts init failed', e); }
+  try { if (typeof initMap === 'function') { initMap(); } else if (typeof ensureMap === 'function') { ensureMap(); } } catch (e) { console.error('Map init failed', e); }
+});
+
+
+function initCharts(){
+  try { updateCharts && updateCharts(); } catch(e){ console.warn('updateCharts not defined', e); }
+}
+
+
+// v3 boot: ensure UI pieces render after DOM is ready
+(function(){
+  function safe(fn){ try { fn && fn(); } catch(e){ console.error(e); } }
+  function boot(){
+    // Checklist
+    safe(function(){
+      if (typeof PAPARAN !== 'undefined' && document.getElementById('paparanGrid')){
+        if (!document.querySelector('#paparanGrid input')){
+          if (typeof renderChecklist === 'function'){
+            renderChecklist('paparanGrid', PAPARAN);
+          }
+        }
+      }
+    });
+    // Map
+    safe(function(){
+      if (document.getElementById('map')){
+        if (typeof initMap === 'function'){ initMap(); }
+        setTimeout(function(){
+          try {
+            if (typeof map !== 'undefined' && map && typeof map.invalidateSize === 'function'){
+              map.invalidateSize();
+            }
+          } catch(_){}
+        }, 600);
+      }
+    });
+    // Charts
+    safe(function(){
+      if (typeof renderCharts === 'function'){ renderCharts(); }
+      else {
+        // Fallback: try specific chart renderers if available
+        if (typeof renderGenderChart === 'function') renderGenderChart();
+        if (typeof renderAgeChart === 'function') renderAgeChart();
+      }
+    });
+  }
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
