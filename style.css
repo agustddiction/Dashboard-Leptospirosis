@@ -135,3 +135,8 @@ body.locked{ overflow:hidden }
 header{ position: sticky; top: 0; z-index: 999; background: var(--bg, #ffffff); }
 header .container, header .wrap{ position: relative; }
 
+
+/* Sticky action bar below header */
+#aksi { position: sticky; top: 64px; z-index: 15; background: #fff; border: 1px solid var(--line); border-radius: 14px; }
+/* Sticky filters panel below action bar */
+.sticky-filters { position: sticky; top: 120px; z-index: 10; background: #fff; }

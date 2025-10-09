@@ -340,9 +340,7 @@ function getFormData(){
     kerja:document.getElementById('kerja').value,
     prov:document.getElementById('prov').value,
     kab:document.getElementById('kab').value,
-    alamat:document.getElementById('alamat').value,
-    tglFasyankes: document.getElementById('tglFasyankes').value,
-    gejala, gejalaTgl,
+    alamat:document.getElementById('alamat').value,gejala, gejalaTgl,
     onset: onsetDate ? onsetDate.toISOString().slice(0,10) : "",paparan,
     lab:{
       leukosit:document.getElementById('leukosit').value,
@@ -377,8 +375,6 @@ function loadCaseIntoForm(d){
   document.getElementById('prov').value = d.prov||''; document.getElementById('prov').dispatchEvent(new Event('change'));
   setTimeout(()=>{ document.getElementById('kab').value = d.kab||''; }, 0);
   document.getElementById('alamat').value = d.alamat||'';
-  document.getElementById('tglFasyankes').value = d.tglFasyankes||'';
-
   initGejalaChecklist();
   Object.entries(d.gejala||{}).forEach(([label,checked])=>{
     const g = GEJALA.find(x => x.label === label);
@@ -703,6 +699,27 @@ function updateCharts(){
 
 
 // =====================
+
+// Initialize map once and load default Indonesia provinces GeoJSON
+let _mapInitialized = false;
+async function initMap(){
+  try{
+    ensureMap();
+    if(!_mapInitialized){
+      try{
+        const geo = await loadFromUrl(DEFAULT_GH);
+        renderChoropleth(geo);
+      }catch(e){
+        console.error('GeoJSON load failed:', e);
+      }
+      _mapInitialized = true;
+    } else {
+      try{ refreshChoropleth(); }catch(_){}
+    }
+  }catch(e){
+    console.error('initMap error:', e);
+  }
+}
 // PETA
 // =====================
 function getColor(val){ const v=Number(val)||0; if(v===0) return '#ffffff'; if(v>0&&v<=50) return '#ffc4c4'; if(v>50&&v<=200) return '#ff7a7a'; return '#cc0000'; }
@@ -770,7 +787,7 @@ function recalcCasesFromLocalAndRefresh(){ const counts=recalcCasesByProvinceFro
 // EKSPOR EXCEL
 // =====================
 function flattenCase(d){
-  const row={ 'UUID':d.uuid||'', 'Nama':d.nama,'Jenis Kelamin':d.jk,'Umur':d.umur,'Pekerjaan':d.kerja,'Provinsi':d.prov,'Kab/Kota':d.kab,'Alamat':d.alamat,'Tgl Fasyankes':d.tglFasyankes,'Onset':d.onset,'Definisi':d.definisi,'Status Akhir':d.statusAkhir,'Tanggal Status':d.tglStatus,'Saved At':d.savedAt };
+  const row={ 'UUID':d.uuid||'', 'Nama':d.nama,'Jenis Kelamin':d.jk,'Umur':d.umur,'Pekerjaan':d.kerja,'Provinsi':d.prov,'Kab/Kota':d.kab,'Alamat':d.alamat,'Onset':d.onset,'Definisi':d.definisi,'Status Akhir':d.statusAkhir,'Tanggal Status':d.tglStatus,'Saved At':d.savedAt };
   GEJALA.forEach(g=>{ const label=g.label; row['Gejala: '+label]=d.gejala[label]?'Ya':''; row['Tgl '+label]=d.gejalaTgl[label]||''; });
   row['Paparan (2 minggu)']=(d.paparan||[]).filter(x=>x.checked).map(x=>x.label).join('; ');
   const Lb=d.lab||{}; 
@@ -805,9 +822,7 @@ function flatToCase(r){
     kerja: r['Pekerjaan']||'',
     prov: r['Provinsi']||'',
     kab: r['Kab/Kota']||'',
-    alamat: r['Alamat']||'',
-    tglFasyankes: r['Tgl Fasyankes']||'',
-    onset: r['Onset']||'',gejala: {}, gejalaTgl: {}, paparan: [],
+    alamat: r['Alamat']||'',onset: r['Onset']||'',gejala: {}, gejalaTgl: {}, paparan: [],
     lab: {
       leukosit: r['Leukosit (x10^3/µL)']||'',
       trombosit: r['Trombosit (x10^3/µL)']||'',
