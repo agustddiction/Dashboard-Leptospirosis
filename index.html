@@ -70,6 +70,10 @@
       </div>
       <label>Alamat Lengkap (RT/RW, Kelurahan, Kecamatan/Dusun/Desa)</label>
       <textarea id="alamat" placeholder="Tulis alamat lengkap..."></textarea>
+       <div style="margin-top:10px">
+          <label>Tanggal Pertama Kali ke Fasyankes</label>
+          <input id="tglFasyankes" type="date"/>
+        </div>
     </section>
 
     <section id="gejala">
@@ -91,13 +95,7 @@
     </section>
 
     <section id="kontak">
-      <h2>Riwayat Kontak</h2>
-      <div class="grid-2">
-        <div>
-          <label>Tanggal Perkiraan Paparan</label>
-          <input id="tglPaparan" type="date"/>
-        </div>
-      </div>
+      <h2>Riwayat Paparan Faktor Risiko (2 minggu terakhir)</h2>
       <label class="muted">Centang faktor risiko dalam 2 minggu terakhir</label>
       <div class="grid-2" id="paparanGrid"></div>
     </section>
@@ -215,17 +213,20 @@
       <div class="row">
         <button class="btn primary" id="simpan">Simpan Kasus</button>
         <button class="btn" id="cancelEdit">Batal Edit</button>
-        <button class="btn" id="reset">Reset Form</button>
+        <button class="btn warning" id="reset">Reset Form</button>
         <span class="right"></span>
-        <button class="btn" id="cekDup">Cek Duplikat</button>
-        <button class="btn" id="hapusDup">Hapus Duplikat</button>
-        <button class="btn" id="exportExcel">Ekspor Excel</button>
+        <button class="btn info" id="cekDup">Cek Duplikat</button>
+        <button class="btn danger" id="hapusDup">Hapus Duplikat</button>
+        <button class="btn ok" id="exportExcel">Ekspor Excel</button>
       </div>
     </section>
 
     <section id="tabel">
       <h2>Data Kasus Tersimpan</h2>
-      <div class="case-counts" id="counts"></div>
+       <div class="case-counts">
+        <span id="counts"></span>
+        <span id="cfrDisplay" class="tag bad" style="margin-left: 8px;"></span>
+      </div>
       <div class="hr"></div>
 
       <div class="sticky-filters">
@@ -276,7 +277,7 @@
 
             <!-- Tombol apply di ujung kanan -->
             <div class="actions">
-              <button class="btn" id="applyFilter">Terapkan</button>
+              <button class="btn info" id="applyFilter">Terapkan</button>
             </div>
           </div>
         </div>
@@ -286,8 +287,13 @@
         <table class="table" id="casesTable">
           <thead>
             <tr>
-              <th>Nama</th><th>Umur</th><th>Provinsi</th><th>Kab/Kota</th>
-              <th>Onset</th><th>Definisi</th><th>Status</th><th>Aksi</th>
+              <th>Nama</th>
+              <th>Umur</th>
+              <th>Jenis Kelamin</th>
+              <th>Tanggal Onset</th>
+              <th>Status Akhir</th>
+              <th>Definisi Kasus</th>
+              <th>Aksi</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -305,6 +311,14 @@
         <div class="chart-card">
           <label class="muted">Sebaran kasus per kabupaten/kota</label>
           <canvas id="kabChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <label class="muted">Sebaran kasus per kelompok umur</label>
+          <canvas id="umurChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <label class="muted">Sebaran kasus per jenis kelamin</label>
+          <canvas id="jkChart"></canvas>
         </div>
       </div>
     </section>
@@ -337,6 +351,8 @@
     </footer>
   </main>
 
-<script defer src="./script.js"></script>
+<script src="./script.js"></script>
 </body>
 </html>
+
+

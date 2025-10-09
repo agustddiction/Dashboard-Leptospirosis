@@ -44,7 +44,13 @@ const PAPARAN=[
   "Menangani spesimen leptospirosis",
   "Pekerjaan berisiko (drh hewan, RPH, pet shop, petani, pembersih selokan, dll.)",
   "Hobi/olahraga/wisata (berenang, memancing, arung jeram, dll.)",
+  "Sering melihat tikus/tanda keberadaan tikus",
+  "Memiliki hewan peliharaan/ternak di rumah",
+  "Menuju kerja/sekolah melewati genangan air/banjir",
+  "Di tempat kerja/sekolah terdapat tikus atau tanda keberadaan tikus",
+  "Membersihkan got/selokan/kolam tanpa APD",
 ];
+
 
 const prov=document.getElementById('prov'); const kab=document.getElementById('kab');
 const fProv=document.getElementById('fProv'); const fKab=document.getElementById('fKab');
@@ -83,7 +89,7 @@ function updateSyncStatus(message, isError = false) {
 window.addEventListener('online', () => {
   syncStatus.isOnline = true;
   updateSyncStatus('Koneksi tersambung, memulai sinkronisasi...');
-  setTimeout(performAutoSync, 1000);
+  setTimeout(scheduleAutoPull, 1000);
 });
 
 window.addEventListener('offline', () => {
@@ -109,7 +115,6 @@ function _syncTimeModeUI(){
     mWrap?.classList.add('inactive');
   }
 }
-document.getElementById('fTimeMode')?.addEventListener('change', _syncTimeModeUI);
 
 function initProvKab(){
   const provs=Object.keys(PROV_KAB).sort();
@@ -207,7 +212,7 @@ function ensureUUIDs() {
 }
 
 // =====================
-// GEJALA & PAPARAN (unchanged)
+// GEJALA & PAPARAN
 // =====================
 let hasInteractedGejala=false;
 function initGejalaChecklist(){
@@ -246,7 +251,7 @@ function initPaparanChecklist(){
 }
 
 // =====================
-// ONSET & DEFINISI (unchanged)
+// ONSET & DEFINISI
 // =====================
 function getOnsetDate(){
   let earliest=null;
@@ -274,8 +279,8 @@ function computeDefinisi(){
   const bili=parseFloat(document.getElementById('bilirubin').value);
   const amil=parseFloat(document.getElementById('amilase').value);
   const cpk =parseFloat(document.getElementById('cpk').value);
-  const proteinuria=document.getElementById('proteinuria').checked;
-  const hematuria=document.getElementById('hematuria').checked;
+  const proteinuria=document.getElementById('proteinuria')?.checked;
+  const hematuria=document.getElementById('hematuria')?.checked;
   const rdt=getRadio('rdt'), mat=getRadio('mat'), pcr=getRadio('pcr');
   const hasFever=!!S.demam; const supportMinor=(S.mialgia||S.malaise||S.conj);
   const suspek=hasFever&&supportMinor&&anyExposure;
@@ -302,30 +307,24 @@ function computeDefinisi(){
 }
 function updateDefinisiBadge(){
   const def=computeDefinisi(); const badge=document.getElementById('defBadge');
+  if (!badge) return;
   badge.textContent="Definisi Kasus: "+def; badge.className='badge';
   if(def==='Confirm') badge.classList.add('ok');
   else if(def==='Probable') badge.classList.add('warn');
   else if(def==='Suspek') badge.classList.add('neutral');
   else badge.classList.add('bad');
 }
-['leukosit','trombosit','bilirubin','sgot','sgpt','kreatinin','amilase','cpk'].forEach(id=>{
-  const el=document.getElementById(id);
-  el && el.addEventListener('input', ()=>{ updateDefinisiBadge(); });
-});
 
 function bindRapidRadioUpdates(){
   ['rdt','mat','pcr'].forEach(name=>{
     document.querySelectorAll('input[name="'+name+'"]').forEach(r=>{
-      const h=()=>{ updateDefinisiBadge(); };
-      r.addEventListener('change', h);
-      r.addEventListener('click', h);
-      r.addEventListener('input', h);
+      r.addEventListener('change', updateDefinisiBadge);
     });
   });
 }
 
 // =====================
-// IMPROVED FORM HANDLING
+// FORM HANDLING
 // =====================
 function getFormData(){
   const onsetDate=getOnsetDate();
@@ -342,29 +341,19 @@ function getFormData(){
     prov:document.getElementById('prov').value,
     kab:document.getElementById('kab').value,
     alamat:document.getElementById('alamat').value,
+    tglFasyankes: document.getElementById('tglFasyankes').value,
     gejala, gejalaTgl,
-    onset: onsetDate ? onsetDate.toISOString().slice(0,10) : "",
-    tglPaparan:document.getElementById('tglPaparan').value,
-    paparan,
+    onset: onsetDate ? onsetDate.toISOString().slice(0,10) : "",paparan,
     lab:{
       leukosit:document.getElementById('leukosit').value,
       trombosit:document.getElementById('trombosit').value,
       bilirubin:document.getElementById('bilirubin').value,
-      sgot:document.getElementById('sgot').value,
-      sgpt:document.getElementById('sgpt').value,
       kreatinin:document.getElementById('kreatinin').value,
       rdt:getRadio('rdt'),
       mat:getRadio('mat'),
-      serovar:document.getElementById('serovar').value,
-      amilase:document.getElementById('amilase').value,
-      cpk:document.getElementById('cpk').value,
-      proteinuria:document.getElementById('proteinuria').checked,
-      hematuria:document.getElementById('hematuria').checked,
-      pcr:getRadio('pcr'),
     },
     statusAkhir:document.getElementById('statusAkhir').value,
     tglStatus:document.getElementById('tglStatus').value,
-    obat:document.getElementById('obat').value,
     definisi:computeDefinisi(),
     savedAt:new Date().toISOString()
   };
@@ -372,7 +361,7 @@ function getFormData(){
 
 function resetForm(){
   hasInteractedGejala=false;
-  document.querySelectorAll('input,select,textarea').forEach(el=>{
+  document.querySelector('.form-column').querySelectorAll('input,select,textarea').forEach(el=>{
     if(el.type==='checkbox'||el.type==='radio') el.checked=false; else el.value='';
   });
   initProvKab(); initGejalaChecklist(); initPaparanChecklist();
@@ -388,6 +377,7 @@ function loadCaseIntoForm(d){
   document.getElementById('prov').value = d.prov||''; document.getElementById('prov').dispatchEvent(new Event('change'));
   setTimeout(()=>{ document.getElementById('kab').value = d.kab||''; }, 0);
   document.getElementById('alamat').value = d.alamat||'';
+  document.getElementById('tglFasyankes').value = d.tglFasyankes||'';
 
   initGejalaChecklist();
   Object.entries(d.gejala||{}).forEach(([label,checked])=>{
@@ -407,15 +397,12 @@ function loadCaseIntoForm(d){
 
   const Lb=d.lab||{};
   const setVal=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=(v??''); };
-  ['leukosit','trombosit','bilirubin','sgot','sgpt','kreatinin','amilase','cpk','serovar'].forEach(id=> setVal(id, Lb[id]));
+  ['leukosit','trombosit','bilirubin','kreatinin'].forEach(id=> setVal(id, Lb[id]));
   const setRadio=(name,v)=>{ const el=document.querySelector(`input[name="${name}"][value="${v}"]`); if(el) el.checked=true; };
-  setRadio('rdt', Lb.rdt||'nd'); setRadio('mat', Lb.mat||'nd'); setRadio('pcr', Lb.pcr||'nd');
-  document.getElementById('proteinuria').checked=!!Lb.proteinuria;
-  document.getElementById('hematuria').checked=!!Lb.hematuria;
+  setRadio('rdt', Lb.rdt||'nd'); setRadio('mat', Lb.mat||'nd');
 
   document.getElementById('statusAkhir').value=d.statusAkhir||'';
   document.getElementById('tglStatus').value=d.tglStatus||'';
-  document.getElementById('obat').value=d.obat||'';
 
   updateDefinisiBadge(); bindRapidRadioUpdates();
   document.getElementById('simpan').textContent = 'Update Kasus';
@@ -430,12 +417,24 @@ function cancelEdit(){
   document.body.classList.remove('editing'); 
   resetForm(); 
 }
-document.getElementById('cancelEdit').addEventListener('click', (e)=>{ e.preventDefault(); cancelEdit(); });
 
 // =====================
 // RENDERING FUNCTIONS
-function valueOrDash(v){ return (v===undefined||v===null||String(v).trim()==='') ? '—' : v; }
 // =====================
+function valueOrDash(v){ return (v===undefined||v===null||String(v).trim()==='') ? '—' : v; }
+
+function calculateAndRenderCFR() {
+  const data = loadCases();
+  const total = data.length;
+  if (total === 0) {
+    document.getElementById('cfrDisplay').textContent = 'CFR: 0%';
+    return;
+  }
+  const meninggal = data.filter(d => d.statusAkhir === 'Meninggal').length;
+  const cfr = (meninggal / total) * 100;
+  document.getElementById('cfrDisplay').textContent = `CFR: ${cfr.toFixed(2)}%`;
+}
+
 function renderCounts(){
   const data=loadCases(); 
   const counts={Suspek:0,Probable:0,Confirm:0,Other:0};
@@ -453,6 +452,7 @@ function renderCounts(){
     span.textContent=`${k}: ${v}`;
     box.appendChild(span);
   });
+  calculateAndRenderCFR();
 }
 
 function defClass(def){ 
@@ -469,29 +469,25 @@ function renderTable(){
   
   data.forEach((d,i)=>{
     const nameCell = valueOrDash(d.nama);
-const umurCell = valueOrDash(d.umur);
-const provCell = valueOrDash(d.prov);
-const kabCell  = valueOrDash(d.kab);
-const onsetCell = valueOrDash(d.onset||'-');
-const statusCell = valueOrDash(d.statusAkhir||'-');
-const defCell = d.definisi||'Tidak memenuhi';
-const defCls = defClass(defCell);
-const uuidTitle = d.uuid||'';
-const tr=document.createElement('tr');
-tr.innerHTML=`
-  <td title="${uuidTitle}">${nameCell}</td>
-  <td>${umurCell}</td>
-  <td>${provCell}</td>
-  <td>${kabCell}</td>
-  <td>${onsetCell}</td>
-  <td><span class="tag ${defCls}">${defCell}</span></td>
-  <td>${statusCell}</td>
-  <td>
-    <button class="btn small" data-edit="${i}">Edit</button> 
-    <button class="btn small" data-del="${i}">Hapus</button>
-  </td>`;
-tbody.appendChild(tr);
-
+    const umurCell = valueOrDash(d.umur);
+    const jkCell = valueOrDash(d.jk).charAt(0);
+    const onsetCell = valueOrDash(d.onset);
+    const statusCell = valueOrDash(d.statusAkhir);
+    const defCell = d.definisi || 'Tidak memenuhi';
+    const defCls = defClass(defCell);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${nameCell}</td>
+      <td>${umurCell}</td>
+      <td>${jkCell}</td>
+      <td>${onsetCell}</td>
+      <td>${statusCell}</td>
+      <td><span class="tag ${defCls}">${defCell}</span></td>
+      <td>
+        <button class="btn small info" data-edit="${i}">Edit</button> 
+        <button class="btn small danger" data-del="${i}">Hapus</button>
+      </td>`;
+    tbody.appendChild(tr);
   });
   
   tbody.querySelectorAll('button[data-edit]').forEach(btn=>{
@@ -511,149 +507,200 @@ tbody.appendChild(tr);
       const arr=loadCases(); 
       arr.splice(i,1); 
       saveCases(arr); 
-      renderTable(); 
-      renderCounts(); 
-      updateCharts(); 
-      recalcCasesFromLocalAndRefresh();
+      renderAll();
       
-      // Trigger sync after deletion
       if (AUTO_SYNC_ENABLED && syncStatus.isOnline) {
-        setTimeout(performAutoSync, 1000);
+        setTimeout(scheduleAutoPull, 1000);
       }
     });
   });
 }
 
-// =====================
-// IMPROVED SAVE FUNCTION WITH AUTO-SYNC
-// =====================
-document.getElementById('simpan').addEventListener('click', async (e) => {
-  e.preventDefault();
-  
-  const data = getFormData();
-  if (!data.nama) { 
-    alert('Nama wajib diisi.'); 
-    return; 
-  }
-  if (!data.prov || !data.kab) { 
-    alert('Provinsi dan Kabupaten/Kota wajib dipilih.'); 
-    return; 
-  }
-  
-  const arr = loadCases();
-  
-  if (editingIndex >= 0) {
-    arr[editingIndex] = data;
-  } else {
-    arr.push(data);
-  }
-  
-  if (saveCases(arr)) {
-    cancelEdit();
+function renderAll(){
     renderTable(); 
     renderCounts(); 
     updateCharts(); 
     recalcCasesFromLocalAndRefresh();
-    
-    alert('Kasus disimpan.');
-    
-    // Trigger immediate sync for new/updated data
-    if (AUTO_SYNC_ENABLED && syncStatus.isOnline) {
-      setTimeout(performAutoSync, 500);
-    }
-  } else {
-    alert('Gagal menyimpan kasus. Silakan coba lagi.');
-  }
-});
+}
 
 // =====================
-// DUPLICATE HANDLING
+// ACTIONS (SAVE, DUPLICATES, ETC)
 // =====================
-document.getElementById('cekDup').addEventListener('click', ()=>{
-  const arr=loadCases(); 
-  const seen={}; 
-  const dups=new Set();
-  
-  arr.forEach((d,i)=>{ 
-    const k=generateDuplicateKey(d); 
-    if(seen[k]!==undefined){ 
-      dups.add(i); 
-      dups.add(seen[k]); 
-    } else { 
-      seen[k]=i; 
-    } 
-  });
-  
-  const rows=document.querySelectorAll('#casesTable tbody tr');
-  rows.forEach((tr,i)=>tr.style.backgroundColor = dups.has(i) ? '#fff7e6' : '');
-  
-  const message = dups.size ? `${dups.size} duplikat ditemukan & ditandai kuning.` : 'Tidak ada duplikat.';
-  alert(message);
-});
+function setupActionButtons() {
+    document.getElementById('simpan').addEventListener('click', (e) => {
+      e.preventDefault();
+      
+      const data = getFormData();
+      if (!data.nama) { 
+        alert('Nama wajib diisi.'); 
+        return; 
+      }
+      if (!data.prov || !data.kab) { 
+        alert('Provinsi dan Kabupaten/Kota wajib dipilih.'); 
+        return; 
+      }
+      
+      const arr = loadCases();
+      
+      if (editingIndex >= 0) {
+        arr[editingIndex] = data;
+      } else {
+        arr.push(data);
+      }
+      
+      if (saveCases(arr)) {
+        cancelEdit();
+        renderAll();
+        alert('Kasus disimpan.');
+        
+        if (AUTO_SYNC_ENABLED && syncStatus.isOnline) {
+          setTimeout(scheduleAutoPull, 500);
+        }
+      } else {
+        alert('Gagal menyimpan kasus. Silakan coba lagi.');
+      }
+    });
+    
+    document.getElementById('cancelEdit').addEventListener('click', (e)=>{ e.preventDefault(); cancelEdit(); });
+    document.getElementById('reset').addEventListener('click', (e)=>{ e.preventDefault(); resetForm(); });
 
-document.getElementById('hapusDup').addEventListener('click', ()=>{
-  const arr=loadCases(); 
-  const seen={}; 
-  const result=[];
-  
-  arr.forEach(d=>{
-    const k=generateDuplicateKey(d);
-    if(!(k in seen)){
-      seen[k]=true;
-      result.push(d);
-    }
-  });
-  
-  const removed=arr.length-result.length;
-  saveCases(result);
-  renderTable(); 
-  renderCounts(); 
-  updateCharts(); 
-  recalcCasesFromLocalAndRefresh();
-  
-  const message = removed > 0 ? `Menghapus ${removed} duplikat.` : 'Tidak ada duplikat untuk dihapus.';
-  alert(message);
-  
-  // Trigger sync after duplicate removal
-  if (AUTO_SYNC_ENABLED && syncStatus.isOnline && removed > 0) {
-    setTimeout(performAutoSync, 1000);
-  }
-});
+    document.getElementById('cekDup').addEventListener('click', ()=>{
+      const arr=loadCases(); 
+      const seen={}; 
+      const dups=new Set();
+      
+      arr.forEach((d,i)=>{ 
+        const k=generateDuplicateKey(d); 
+        if(seen[k]!==undefined){ 
+          dups.add(i); 
+          dups.add(seen[k]); 
+        } else { 
+          seen[k]=i; 
+        } 
+      });
+      
+      const rows=document.querySelectorAll('#casesTable tbody tr');
+      rows.forEach((tr,i)=>tr.style.backgroundColor = dups.has(i) ? '#fefce8' : '');
+      
+      const message = dups.size ? `${dups.size / 2} pasang duplikat ditemukan & ditandai kuning.` : 'Tidak ada duplikat.';
+      alert(message);
+    });
+
+    document.getElementById('hapusDup').addEventListener('click', ()=>{
+      const arr=loadCases(); 
+      const seen={}; 
+      const result=[];
+      
+      arr.forEach(d=>{
+        const k=generateDuplicateKey(d);
+        if(!(k in seen)){
+          seen[k]=true;
+          result.push(d);
+        }
+      });
+      
+      const removed=arr.length-result.length;
+      if (removed === 0) {
+        alert('Tidak ada duplikat untuk dihapus.');
+        return;
+      }
+
+      if (confirm(`Menemukan ${removed} duplikat. Hapus?`)) {
+          saveCases(result);
+          renderAll();
+          alert(`Menghapus ${removed} duplikat.`);
+          if (AUTO_SYNC_ENABLED && syncStatus.isOnline) {
+            setTimeout(scheduleAutoPull, 1000);
+          }
+      }
+    });
+
+    document.getElementById('exportExcel').addEventListener('click', exportToExcel);
+}
+
 
 // =====================
 // CHARTS
 // =====================
-let trendChart, kabChart;
+let trendChart, kabChart, umurChart, jkChart;
 function ensureCharts(){
-  const ctx1=document.getElementById('trendChart').getContext('2d');
-  const ctx2=document.getElementById('kabChart').getContext('2d');
-  if(!trendChart){ trendChart=new Chart(ctx1,{type:'line',data:{labels:[],datasets:[{label:'Kasus',data:[]}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}}); }
-  if(!kabChart){ kabChart=new Chart(ctx2,{type:'bar',data:{labels:[],datasets:[{label:'Kasus',data:[]}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}}); }
+  const defaultOptions = {
+    responsive: true, maintainAspectRatio: false,
+    plugins:{ legend:{ display:false } },
+    scales:{ y:{ beginAtZero:true } }
+  };
+  const pieOptions = {
+    responsive: true, maintainAspectRatio: false,
+    plugins:{ legend:{ position:'top' } }
+  };
+
+  if(!trendChart){ trendChart=new Chart('trendChart',{type:'line',data:{labels:[],datasets:[{label:'Kasus',data:[],borderColor:'#111'}]},options:defaultOptions}); }
+  if(!kabChart){ kabChart=new Chart('kabChart',{type:'bar',data:{labels:[],datasets:[{label:'Kasus',data:[],backgroundColor:'#6b7280'}]},options:defaultOptions}); }
+  if(!umurChart){ umurChart=new Chart('umurChart',{type:'bar',data:{labels:[],datasets:[{label:'Kasus',data:[],backgroundColor:'#0284c7'}]},options:defaultOptions}); }
+  if(!jkChart){ jkChart=new Chart('jkChart',{type:'doughnut',data:{labels:['Laki-laki', 'Perempuan', 'Tidak diisi'],datasets:[{label:'Kasus',data:[],backgroundColor:['#0284c7', '#db2777', '#e5e7eb']}]},options:pieOptions}); }
 }
-ensureCharts();
+
 function getDateForAgg(d){ return d.onset || d.tglStatus || (d.savedAt ? d.savedAt.slice(0,10) : ''); }
 function monthKey(dateStr){ return dateStr ? dateStr.slice(0,7) : ''; }
 function yearKey(dateStr){ return dateStr ? dateStr.slice(0,4) : ''; }
 function withinRangeMonth(dateStr,start,end){ const m=monthKey(dateStr); if(!m) return false; if(start&&m<start) return false; if(end&&m>end) return false; return true; }
 function withinRangeYear(dateStr,ys,ye){ const y=yearKey(dateStr); if(!y) return false; if(ys&&y<ys) return false; if(ye&&y>ye) return false; return true; }
+
 function updateCharts(){
+  ensureCharts();
   const arr=loadCases();
   const fp=fProv.value||""; const fk=fKab.value||"";
   const mode=fTimeMode.value||'month';
   const ms=fStart.value||""; const me=fEnd.value||"";
   const ys=(fYearStart.value||''); const ye=(fYearEnd.value||'');
+  
   const filtered=arr.filter(d=>{
     if(fp&&d.prov!==fp) return false;
     if(fk&&d.kab!==fk) return false;
     const ds=getDateForAgg(d);
     return (mode==='month') ? withinRangeMonth(ds,ms,me) : withinRangeYear(ds,ys,ye);
   });
+
+  // Trend Chart
   const agg={}; filtered.forEach(d=>{ const ds=getDateForAgg(d); const key=(mode==='month')? monthKey(ds) : yearKey(ds); if(!key) return; agg[key]=(agg[key]||0)+1; });
-  const keys=Object.keys(agg).sort(); trendChart.data.labels=keys; trendChart.data.datasets[0].data=keys.map(k=>agg[k]||0); trendChart.update();
+  const keys=Object.keys(agg).sort(); 
+  trendChart.data.labels=keys; 
+  trendChart.data.datasets[0].data=keys.map(k=>agg[k]||0); 
+  trendChart.update();
+
+  // Kab/Kota Chart
   const perKab={}; filtered.forEach(d=>{ const kk=d.kab||'(Tidak diisi)'; perKab[kk]=(perKab[kk]||0)+1; });
-  const kLabels=Object.keys(perKab).sort(); kabChart.data.labels=kLabels; kabChart.data.datasets[0].data=kLabels.map(k=>perKab[k]||0); kabChart.update();
+  const kLabels=Object.keys(perKab).sort((a, b) => perKab[b] - perKab[a]).slice(0, 15); // Top 15
+  kabChart.data.labels=kLabels; 
+  kabChart.data.datasets[0].data=kLabels.map(k=>perKab[k]||0); 
+  kabChart.update();
+  
+  // Umur Chart
+  const ageGroups = { '0-4':0, '5-14':0, '15-44':0, '45-64':0, '65+':0, 'N/A':0 };
+  filtered.forEach(d => {
+    const age = parseInt(d.umur, 10);
+    if (isNaN(age)) { ageGroups['N/A']++; }
+    else if (age <= 4) { ageGroups['0-4']++; }
+    else if (age <= 14) { ageGroups['5-14']++; }
+    else if (age <= 44) { ageGroups['15-44']++; }
+    else if (age <= 64) { ageGroups['45-64']++; }
+    else { ageGroups['65+']++; }
+  });
+  umurChart.data.labels = Object.keys(ageGroups);
+  umurChart.data.datasets[0].data = Object.values(ageGroups);
+  umurChart.update();
+  
+  // Jenis Kelamin Chart
+  const jkCounts = { 'Laki-laki': 0, 'Perempuan': 0, 'Tidak diisi': 0 };
+  filtered.forEach(d => {
+    if (d.jk === 'Laki-laki') { jkCounts['Laki-laki']++; }
+    else if (d.jk === 'Perempuan') { jkCounts['Perempuan']++; }
+    else { jkCounts['Tidak diisi']++; }
+  });
+  jkChart.data.datasets[0].data = [jkCounts['Laki-laki'], jkCounts['Perempuan'], jkCounts['Tidak diisi']];
+  jkChart.update();
 }
-document.getElementById('applyFilter').addEventListener('click', updateCharts);
+
 
 // =====================
 // PETA
@@ -661,7 +708,7 @@ document.getElementById('applyFilter').addEventListener('click', updateCharts);
 function getColor(val){ const v=Number(val)||0; if(v===0) return '#ffffff'; if(v>0&&v<=50) return '#ffc4c4'; if(v>50&&v<=200) return '#ff7a7a'; return '#cc0000'; }
 let geojsonLayer; let _labels=[]; window._leaf_map = null;
 function ensureMap(){ if(window._leaf_map) return window._leaf_map; window._leaf_map=L.map('map',{zoomControl:true,attributionControl:false}); window.addEventListener('resize', ()=>{ try{ window._leaf_map.invalidateSize(); }catch(_){}}); return window._leaf_map; }
-let casesByProvince={"Aceh":12,"Sumatera Utara":28,"Sumatera Barat":8,"Riau":15,"Jambi":5,"Sumatera Selatan":31,"Bengkulu":2,"Lampung":44,"Kepulauan Bangka Belitung":1,"Kepulauan Riau":3,"DKI Jakarta":320,"Jawa Barat":188,"Jawa Tengah":96,"DI Yogyakarta":45,"Jawa Timur":210,"Banten":74,"Bali":12,"Nusa Tenggara Barat":9,"Nusa Tenggara Timur":20,"Kalimantan Barat":6,"Kalimantan Tengah":4,"Kalimantan Selatan":11,"Kalimantan Timur":7,"Kalimantan Utara":1,"Sulawesi Utara":5,"Sulawesi Tengah":6,"Sulawesi Selatan":130,"Sulawesi Tenggara":4,"Gorontalo":1,"Sulawesi Barat":2,"Maluku":1,"Maluku Utara":1,"Papua Barat":1,"Papua":2,"Papua Selatan":0,"Papua Tengah":0,"Papua Pegunungan":0};
+let casesByProvince={"Aceh":12,"Sumatera Utara":28};
 function totalNational(){ return Object.values(casesByProvince).reduce((a,b)=>a+(+b||0),0); }
 function getProvName(props){ return props?.provinsi||props?.Provinsi||props?.PROVINSI||props?.NAME_1||props?.Name||props?.WADMPR||props?.wadmpr||props?.WADMPRV||props?.nama||props?.name||''; }
 function styleFeature(feat){ const prov=getProvName(feat.properties||{}); const val=+casesByProvince[prov]||0; return {weight:1,color:'#9ca3af',fillColor:getColor(val),fillOpacity:0.8}; }
@@ -706,101 +753,40 @@ function renderChoropleth(geojson){
 function fitIndonesia(){ if(geojsonLayer){ window._leaf_map.fitBounds(geojsonLayer.getBounds(),{padding:[10,10]}); } }
 
 function exportPNG(){
-  if(!window._leaf_map){ alert('Peta belum ditampilkan.'); return; }
-  const map = window._leaf_map;
-
-  const attemptLeafletImage = () => {
-    try{
-      leafletImage(map, function(err, canvas){
-        if(err || !canvas){ return fallbackHtml2Canvas(); }
-        try{
-          const ctx = canvas.getContext('2d');
-          const img = ctx.getImageData(0,0,canvas.width,canvas.height).data;
-          let hasPixel = false;
-          for(let i=3;i<img.length;i+=4){ if(img[i] !== 0){ hasPixel = true; break; } }
-          if(!hasPixel){ return fallbackHtml2Canvas(); }
-          const a = document.createElement('a');
-          a.download = `peta-leptospirosis-${new Date().toISOString().slice(0,10)}.png`;
-          a.href = canvas.toDataURL('image/png');
-          a.click();
-        }catch(e){
-          return fallbackHtml2Canvas();
-        }
-      });
-    }catch(e){
-      return fallbackHtml2Canvas();
-    }
-  };
-
-  if(typeof map.whenReady === 'function'){
-    map.whenReady(() => {
-      if(map._tilesToLoad && map._tilesToLoad > 0){
-        map.once('idle', attemptLeafletImage);
-      }else{
-        attemptLeafletImage();
-      }
+    if(!window._leaf_map){ alert('Peta belum ditampilkan.'); return; }
+    leafletImage(window._leaf_map, function(err, canvas) {
+        if(err){ alert('Gagal mengekspor PNG. Coba lagi.'); return; }
+        const a = document.createElement('a');
+        a.download = `peta-leptospirosis-${new Date().toISOString().slice(0,10)}.png`;
+        a.href = canvas.toDataURL('image/png');
+        a.click();
     });
-  }else{
-    attemptLeafletImage();
-  }
-
-  function fallbackHtml2Canvas(){
-    const target = document.getElementById('map') || map.getContainer();
-    if(typeof html2canvas === 'undefined'){
-      const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
-      s.onload = () => doHtml2Canvas(target);
-      s.onerror = () => alert('Gagal mengekspor PNG. Coba lagi setelah peta tampil sepenuhnya.');
-      document.head.appendChild(s);
-    }else{
-      doHtml2Canvas(target);
-    }
-  }
-  function doHtml2Canvas(el){
-    html2canvas(el, {useCORS:true, backgroundColor:null, scale:2}).then(canvas => {
-      const a = document.createElement('a');
-      a.download = `peta-leptospirosis-${new Date().toISOString().slice(0,10)}.png`;
-      a.href = canvas.toDataURL('image/png');
-      a.click();
-    }).catch(()=> alert('Gagal mengekspor PNG.'));
-  }
 }
 
 function recalcCasesByProvinceFromLocal(){ const arr=loadCases(); const counts={}; arr.forEach(d=>{ const p=d.prov||'(Tidak diisi)'; counts[p]=(counts[p]||0)+1; }); return counts; }
 function recalcCasesFromLocalAndRefresh(){ const counts=recalcCasesByProvinceFromLocal(); if(Object.keys(counts).length){ casesByProvince=counts; refreshChoropleth(); } }
-document.getElementById('recalcMap')?.addEventListener('click', ()=>recalcCasesFromLocalAndRefresh());
-document.getElementById('exportPng')?.addEventListener('click', exportPNG);
-async function initMap(){
-  ensureMap();
-  try{
-    const data=await loadFromUrl(DEFAULT_GH);
-    renderChoropleth(data);
-    recalcCasesFromLocalAndRefresh();
-    document.getElementById('mapMsg').textContent = '';
-  }catch(err){ /* pesan sudah ditampilkan */ }
-}
 
 // =====================
 // EKSPOR EXCEL
 // =====================
 function flattenCase(d){
-  const row={ 'UUID':d.uuid||'', 'Nama':d.nama,'Jenis Kelamin':d.jk,'Umur':d.umur,'Pekerjaan':d.kerja,'Provinsi':d.prov,'Kab/Kota':d.kab,'Alamat':d.alamat,'Onset':d.onset,'Tanggal Paparan':d.tglPaparan,'Definisi':d.definisi,'Status Akhir':d.statusAkhir,'Tanggal Status':d.tglStatus,'Obat':d.obat,'Saved At':d.savedAt };
+  const row={ 'UUID':d.uuid||'', 'Nama':d.nama,'Jenis Kelamin':d.jk,'Umur':d.umur,'Pekerjaan':d.kerja,'Provinsi':d.prov,'Kab/Kota':d.kab,'Alamat':d.alamat,'Tgl Fasyankes':d.tglFasyankes,'Onset':d.onset,'Definisi':d.definisi,'Status Akhir':d.statusAkhir,'Tanggal Status':d.tglStatus,'Saved At':d.savedAt };
   GEJALA.forEach(g=>{ const label=g.label; row['Gejala: '+label]=d.gejala[label]?'Ya':''; row['Tgl '+label]=d.gejalaTgl[label]||''; });
   row['Paparan (2 minggu)']=(d.paparan||[]).filter(x=>x.checked).map(x=>x.label).join('; ');
-  const Lb=d.lab||{}; row['Leukosit (x10^3/µL)']=Lb.leukosit||''; row['Trombosit (x10^3/µL)']=Lb.trombosit||'';
-  row['Bilirubin (mg/dL)']=Lb.bilirubin||''; row['SGOT (U/L)']=Lb.sgot||''; row['SGPT (U/L)']=Lb.sgpt||''; row['Kreatinin (mg/dL)']=Lb.kreatinin||''; row['Amilase (U/L)']=Lb.amilase||''; row['CPK (U/L)']=Lb.cpk||'';
-  row['Proteinuria']=Lb.proteinuria?'Ya':''; row['Hematuria']=Lb.hematuria?'Ya':'';
+  const Lb=d.lab||{}; 
+  row['Leukosit (x10^3/µL)']=Lb.leukosit||''; 
+  row['Trombosit (x10^3/µL)']=Lb.trombosit||'';
+  row['Bilirubin (mg/dL)']=Lb.bilirubin||''; 
+  row['Kreatinin (mg/dL)']=Lb.kreatinin||'';
   const map3=v=>v==='pos'?'Positif':(v==='neg'?'Negatif':(v==='nd'?'Tidak diperiksa':''));
-  row['RDT']=map3(Lb.rdt); row['MAT']=map3(Lb.mat); row['PCR']=map3(Lb.pcr); row['Serovar']=Lb.serovar||'';
+  row['RDT']=map3(Lb.rdt); row['MAT']=map3(Lb.mat);
   return row;
 }
 function exportToExcel(){ const arr=loadCases(); if(arr.length===0){ alert('Tidak ada data untuk diekspor.'); return; } const rows=arr.map(flattenCase); const ws=XLSX.utils.json_to_sheet(rows); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Kasus'); XLSX.writeFile(wb,'leptospirosis_cases.xlsx'); }
-document.getElementById('exportExcel').addEventListener('click', exportToExcel);
 
 // =====================
-// GOOGLE SHEETS (anti duplikat + full sync)
+// GOOGLE SHEETS
 // =====================
-function setPullStatus(msg){ const el=document.getElementById('pullStatus'); if(el) el.textContent=msg||''; }
 function parseGVizJSON(text){
   const start=text.indexOf('{'); const end=text.lastIndexOf('}');
   if(start<0||end<0) throw new Error('Format GViz tidak dikenali');
@@ -820,30 +806,19 @@ function flatToCase(r){
     prov: r['Provinsi']||'',
     kab: r['Kab/Kota']||'',
     alamat: r['Alamat']||'',
-    onset: r['Onset']||'',
-    tglPaparan: r['Tanggal Paparan']||'',
-    gejala: {}, gejalaTgl: {},
-    paparan: [],
+    tglFasyankes: r['Tgl Fasyankes']||'',
+    onset: r['Onset']||'',gejala: {}, gejalaTgl: {}, paparan: [],
     lab: {
       leukosit: r['Leukosit (x10^3/µL)']||'',
       trombosit: r['Trombosit (x10^3/µL)']||'',
       bilirubin: r['Bilirubin (mg/dL)']||'',
-      sgot: r['SGOT (U/L)']||'',
-      sgpt: r['SGPT (U/L)']||'',
       kreatinin: r['Kreatinin (mg/dL)']||'',
-      amilase: r['Amilase (U/L)']||'',
-      cpk: r['CPK (U/L)']||'',
-      proteinuria: (r['Proteinuria']||'')==='Ya',
-      hematuria: (r['Hematuria']||'')==='Ya',
       rdt: ((r['RDT']||'').toLowerCase().startsWith('pos')?'pos':((r['RDT']||'').toLowerCase().startsWith('neg')?'neg':'nd')),
       mat: ((r['MAT']||'').toLowerCase().startsWith('pos')?'pos':((r['MAT']||'').toLowerCase().startsWith('neg')?'neg':'nd')),
-      pcr: ((r['PCR']||'').toLowerCase().startsWith('pos')?'pos':((r['PCR']||'').toLowerCase().startsWith('neg')?'neg':'nd')),
-      serovar: r['Serovar']||''
     },
     definisi: r['Definisi']||'',
     statusAkhir: r['Status Akhir']||'',
     tglStatus: r['Tanggal Status']||'',
-    obat: r['Obat']||'',
     savedAt: r['Saved At']||new Date().toISOString()
   };
 }
@@ -863,20 +838,6 @@ function mergeCases(localArr, remoteArr){
     }
   });
   return Array.from(byKey.values());
-}
-
-
-function dedupeLocalStorage(){
-  const arr = loadCases();
-  const seen = new Set();
-  const out = [];
-  for(const d of arr){
-    const k = getKey(d);
-    if(!seen.has(k)){ seen.add(k); out.push(d); }
-  }
-  if(out.length !== arr.length){
-    saveCases(out);
-  }
 }
 
 async function readSheetCases(){
@@ -901,40 +862,22 @@ async function pullFromSheets(opts={merge:true, silent:false}){
     } else {
       saveCases(remoteCases);
     }
-    renderTable(); renderCounts(); updateCharts(); recalcCasesFromLocalAndRefresh();
-    const now = new Date().toLocaleString('id-ID');
-    setPullStatus(`Tarik otomatis OK • ${now}`);
+    renderAll();
+    updateSyncStatus('Tarik data dari G-Sheet berhasil.');
     if(!opts.silent) alert('Data dari Google Sheet sudah dimuat/di-merge.');
   }catch(e){
     console.error('pullFromSheets error', e);
-    setPullStatus('Gagal tarik otomatis (cek publish Sheet & ID)');
+    updateSyncStatus('Gagal tarik data (cek publish Sheet & ID)', true);
     if(!opts.silent) alert('Gagal menarik data dari Google Sheet. Pastikan Sheet di-publish ke web.');
   }
 }
-document.getElementById('pullSheets')?.addEventListener('click', ()=>pullFromSheets({merge:true, silent:false}));
 
-async function sendRowToSheets(row){
-  if(!SHEETS_URL){ console.warn('SHEETS_URL kosong'); return; }
-  try{
-    const arr = loadCases(); ensureUUIDs();
-    const key = getKey(arr[arr.length-1] || {});
-    const sent = JSON.parse(localStorage.getItem('lepto_sent_keys')||'[]');
-    if(sent.includes(key)){ console.log('Lewati kirim: baris sudah pernah dikirim'); return; }
-    await fetch(SHEETS_URL, {
-      method: 'POST', mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ token: ACCESS_TOKEN, action: 'append', row })
-    });
-    sent.push(key); localStorage.setItem('lepto_sent_keys', JSON.stringify(sent));
-  }catch(e){ console.warn('Gagal kirim Sheets:', e); }
-}
-
-async function sendAllToSheets(){
-  if(!SHEETS_URL){ alert('SHEETS_URL belum diisi.'); return; }
+async function sendAllToSheets(silent = false){
+  if(!SHEETS_URL){ if(!silent) alert('SHEETS_URL belum diisi.'); return; }
   ensureUUIDs();
   let arr = loadCases();
-  if(!arr.length){ alert('Tidak ada data.'); return; }
-  // dedupe lokal pilih terbaru per key
+  if(!arr.length){ if(!silent) alert('Tidak ada data lokal untuk dikirim.'); return; }
+  
   const localByKey = new Map();
   const toDate = s => { try{ return new Date(s); }catch(_){ return new Date(0);} };
   for(const d of arr){
@@ -948,33 +891,43 @@ async function sendAllToSheets(){
     }
   }
   let toSend = Array.from(localByKey.values());
+
   try{
+    updateSyncStatus('Mengecek data di G-Sheet...');
     const remote = await readSheetCases();
     const remoteKeys = new Set(remote.map(getKey));
     toSend = toSend.filter(d => !remoteKeys.has(getKey(d)));
   }catch(e){
-    console.warn('Lewati cek duplikat dari Sheet (GViz tidak tersedia):', e);
+    console.warn('Gagal cek duplikat dari Sheet (GViz tidak tersedia):', e);
   }
+  
   if(toSend.length === 0){
-    alert('Tidak ada baris baru untuk dikirim (semua sudah ada di Sheet).');
+    if(!silent) alert('Tidak ada baris data baru untuk dikirim.');
+    updateSyncStatus('Semua data sudah sinkron.');
     return;
   }
+
   try{
+    updateSyncStatus(`Mengirim ${toSend.length} baris baru...`);
     await fetch(SHEETS_URL, {
       method: 'POST', mode: 'no-cors',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ token: ACCESS_TOKEN, action: 'appendBatch', rows: toSend.map(flattenCase) })
     });
-    alert('Permintaan sync dikirim: '+toSend.length+' baris baru.');
-  }catch(e){ alert('Gagal sync: '+e); }
+    if(!silent) alert(`Permintaan sync dikirim: ${toSend.length} baris baru.`);
+    updateSyncStatus('Pengiriman data ke G-Sheet berhasil.');
+  }catch(e){ 
+      if(!silent) alert('Gagal sync: '+e); 
+      updateSyncStatus('Gagal mengirim data.', true);
+  }
 }
-document.getElementById('syncSheets')?.addEventListener('click', sendAllToSheets);
 
 async function sendReplaceAllToSheets(){
   if(!SHEETS_URL){ alert('SHEETS_URL belum diisi.'); return; }
   ensureUUIDs();
   let arr = loadCases();
   if(!arr.length){ alert('Tidak ada data lokal untuk disinkronkan.'); return; }
+
   const byKey = new Map();
   const toDate = s => { try{ return new Date(s); }catch(_){ return new Date(0);} };
   for(const d of arr){
@@ -988,95 +941,168 @@ async function sendReplaceAllToSheets(){
     }
   }
   const uniqueLatest = Array.from(byKey.values());
-  const ok = confirm('PERINGATAN: Tindakan ini akan MENGGANTI seluruh isi sheet dengan '+uniqueLatest.length+' baris dari aplikasi ini.\nLanjutkan?');
+  const ok = confirm(`PERINGATAN: Tindakan ini akan MENGGANTI seluruh isi sheet dengan ${uniqueLatest.length} baris dari aplikasi ini.\nLanjutkan?`);
   if(!ok) return;
+
   try{
+    updateSyncStatus(`Mengirim ${uniqueLatest.length} baris (replace)...`);
     await fetch(SHEETS_URL, {
       method: 'POST', mode: 'no-cors',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ token: ACCESS_TOKEN, action: 'replaceAll', rows: uniqueLatest.map(flattenCase) })
     });
     alert('Permintaan Full Sync (Replace All) dikirim. Periksa Google Sheet Anda.');
+    updateSyncStatus('Full Sync (Replace All) berhasil dikirim.');
   }catch(e){
     alert('Gagal Full Sync: '+e);
+    updateSyncStatus('Gagal Full Sync.', true);
   }
 }
-document.getElementById('fullSyncSheets')?.addEventListener('click', sendReplaceAllToSheets);
 
-// Jadwal auto-pull setelah login
 let _autoTimer = null;
 async function scheduleAutoPull(){
-  if(!AUTO_PULL) return;
+  if(!AUTO_SYNC_ENABLED) return;
   await pullFromSheets({merge:true, silent:true});
   if(_autoTimer) clearInterval(_autoTimer);
-  _autoTimer = setInterval(()=>pullFromSheets({merge:true, silent:true}), AUTO_PULL_INTERVAL_MS);
+  _autoTimer = setInterval(()=>pullFromSheets({merge:true, silent:true}), AUTO_SYNC_INTERVAL_MS);
 }
 
-// =====================
-// AUTO UPDATE & STARTUP + TOKEN CORE
-// =====================
-const _root=document.querySelector('main');
-function _autoUpd(){ updateOnset(); updateDefinisiBadge(); toggleManualOnset(); }
-_root.addEventListener('input', _autoUpd, true);
-_root.addEventListener('change', _autoUpd, true);
-_root.addEventListener('keyup', _autoUpd, true);
-_root.addEventListener('click', _autoUpd, true);
 
-function _bindHeader(){ _bindHeaderShadow(); _syncTimeModeUI(); }
-initGejalaChecklist(); initPaparanChecklist();
-updateOnset(); updateDefinisiBadge(); ensureUUIDs(); renderTable(); renderCounts(); updateCharts(); _bindHeader(); bindRapidRadioUpdates();
+// =====================
+// INITIALIZATION & TOKEN
+// =====================
 
-// TOKEN
+function initApp() {
+    // Auto-update form logic on input
+    const _root=document.querySelector('.form-column');
+    const _autoUpd = () => { updateOnset(); updateDefinisiBadge(); toggleManualOnset(); };
+    _root.addEventListener('input', _autoUpd, true);
+    _root.addEventListener('change', _autoUpd, true);
+
+    // Initial UI setup and data rendering
+    _bindHeaderShadow(); 
+    _syncTimeModeUI();
+    document.getElementById('fTimeMode')?.addEventListener('change', _syncTimeModeUI);
+
+    initGejalaChecklist(); 
+    initPaparanChecklist();
+    updateOnset(); 
+    updateDefinisiBadge(); 
+    ensureUUIDs(); 
+    renderAll(); 
+    bindRapidRadioUpdates();
+    setupActionButtons();
+
+    // Map and chart event listeners
+    document.getElementById('applyFilter').addEventListener('click', updateCharts);
+    document.getElementById('recalcMap')?.addEventListener('click', recalcCasesFromLocalAndRefresh);
+    document.getElementById('exportPng')?.addEventListener('click', exportPNG);
+    
+    // Sheets buttons
+    document.getElementById('pullSheets')?.addEventListener('click', ()=>pullFromSheets({merge:true, silent:false}));
+    document.getElementById('syncSheets')?.addEventListener('click', ()=>sendAllToSheets(false));
+    document.getElementById('fullSyncSheets')?.addEventListener('click', sendReplaceAllToSheets);
+    
+    // Initialize map and charts
+    initMap();
+    setTimeout(() => {
+        try{ 
+            if(window._leaf_map) {
+                window._leaf_map.invalidateSize(); 
+                fitIndonesia();
+            }
+        } catch(e) {
+            console.warn("Map resize failed:", e);
+        }
+    }, 500);
+
+    // Start auto-sync schedule
+    scheduleAutoPull();
+}
+
 (function(){
   const OK_KEY = 'lepto_token_ok';
   function hasOk(){ try{ return localStorage.getItem(OK_KEY)==='1'; }catch(_){ return false; } }
   let unlocked=false;
-  function hideLock(){ const el=document.getElementById('lock'); if(el){ el.remove(); document.body.classList.remove('locked'); } }
+  
+  function hideLock(){ 
+      const el=document.getElementById('lock'); 
+      if(el){ 
+          el.remove(); 
+          document.body.classList.remove('locked'); 
+      } 
+  }
+  
   function showLock(){
     const el=document.getElementById('lock');
     if(!el) return;
-    el.classList.remove('hidden');
     document.body.classList.add('locked');
-    bindHandlers();
-    setTimeout(()=>document.getElementById('tokenInput')?.focus(), 50);
+    el.style.display = 'flex';
+    document.getElementById('tokenInput')?.focus();
   }
+  
   function bindHandlers(){
-    const btn=document.getElementById('unlockBtn');
     const form=document.getElementById('lockForm');
-    const input=document.getElementById('tokenInput');
     const err=document.getElementById('lockErr');
+    
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        verifyToken();
+    };
+
     if(err) err.style.display='none';
-    if(btn) btn.addEventListener('click', e=>{ e.preventDefault(); verifyToken(); });
-    if(form) form.addEventListener('submit', e=>{ e.preventDefault(); verifyToken(); });
-    if(input) input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); verifyToken(); } });
+    if(form) form.addEventListener('submit', handleSubmit);
   }
+  
   function afterUnlock(){
-    if(unlocked) return; unlocked=true;
+    if(unlocked) return; 
+    unlocked=true;
     hideLock();
-    try{ renderTable(); renderCounts(); updateCharts(); }catch(_){}
-    try{ recalcCasesFromLocalAndRefresh(); }catch(_){}
-    setTimeout(()=>{
-      try{ initMap(); }catch(_){}
-      try{ trendChart?.resize(); kabChart?.resize(); }catch(_){}
-      setTimeout(()=>{ if(window._leaf_map){ try{ window._leaf_map.invalidateSize(); fitIndonesia(); }catch(_){}} },200);
-      try{ scheduleAutoPull(); }catch(_){}
-    },100);
+    initApp();
   }
+  
   function verifyToken(){
     const val=(document.getElementById('tokenInput')?.value||'').trim();
     const err=document.getElementById('lockErr');
-    if(val===ACCESS_TOKEN){ try{ localStorage.setItem(OK_KEY,'1'); }catch(_){ } afterUnlock(); }
-    else { if(err){ err.textContent='Token salah. Coba lagi.'; err.style.display='block'; } }
+    if(val===ACCESS_TOKEN){ 
+        try{ localStorage.setItem(OK_KEY,'1'); }catch(_){ } 
+        afterUnlock(); 
+    } else { 
+        if(err){ 
+            err.textContent='Token salah. Coba lagi.'; 
+            err.style.display='block'; 
+        } 
+    }
   }
+  
   function autoUnlockFromURL(){
     try{
       const sp=new URLSearchParams(location.search);
       const t=sp.get('token'); const skip=sp.get('skipToken')==='1';
-      if(skip || t===ACCESS_TOKEN){ try{ localStorage.setItem(OK_KEY,'1'); }catch(_){ } afterUnlock(); return true; }
+      if(skip || t===ACCESS_TOKEN){ 
+          try{ localStorage.setItem(OK_KEY,'1'); }catch(_){ } 
+          afterUnlock(); 
+          return true; 
+      }
     }catch(_){}
     return false;
   }
-  function start(){ if(hasOk()){ afterUnlock(); return; } if(autoUnlockFromURL()) return; showLock(); }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', start); else start();
+  
+  function start(){ 
+    bindHandlers();
+    if(autoUnlockFromURL()) return;
+    if(hasOk()){
+        afterUnlock(); 
+        return; 
+    } 
+    showLock();
+  }
+  
+  if(document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', start); 
+  } else {
+      start();
+  }
+  
   window.__leptoToken={ verifyToken, showLock, afterUnlock };
 })();
