@@ -44,6 +44,11 @@ const PAPARAN=[
   "Menangani spesimen leptospirosis",
   "Pekerjaan berisiko (drh hewan, RPH, pet shop, petani, pembersih selokan, dll.)",
   "Hobi/olahraga/wisata (berenang, memancing, arung jeram, dll.)",
+  "Sering melihat tikus/tanda keberadaan tikus",
+  "Memiliki hewan peliharaan/ternak di rumah",
+  "Menuju kerja/sekolah melewati genangan air/banjir",
+  "Di tempat kerja/sekolah terdapat tikus atau tanda keberadaan tikus",
+  "Membersihkan got/selokan/kolam tanpa APD"
 ];
 
 const prov=document.getElementById('prov'); const kab=document.getElementById('kab');
@@ -177,335 +182,7 @@ function loadCases() {
   }
 }
 
-function saveCases(arr) {
-  try {
-    localStorage.setItem('lepto_cases', JSON.stringify(arr));
-    syncStatus.pendingChanges = arr.length;
-    return true;
-  } catch (e) {
-    console.error('Error saving cases:', e);
-    updateSyncStatus('Gagal menyimpan data lokal', true);
-    return false;
-  }
-}
-
-function ensureUUIDs() {
-  const arr = loadCases();
-  let changed = false;
-  
-  arr.forEach(data => {
-    if (!data.uuid) {
-      data.uuid = genUUID();
-      changed = true;
-    }
-  });
-  
-  if (changed) {
-    saveCases(arr);
-  }
-}
-
-// =====================
-// GEJALA & PAPARAN
-// =====================
-let hasInteractedGejala=false;
-function initGejalaChecklist(){
-  const grid=document.getElementById('gejalaGrid');
-  grid.innerHTML='';
-  const today=new Date().toISOString().slice(0,10);
-  GEJALA.forEach(g=>{
-    const wrap=document.createElement('div');
-    wrap.className="symptom";
-    wrap.innerHTML=`
-      <input type="checkbox" id="g_${g.id}" data-symptom="${g.id}">
-      <label for="g_${g.id}" style="margin:0;font-weight:500">${g.label}</label>
-      <input type="date" id="d_${g.id}" style="display:none" max="${today}">
-    `;
-    grid.appendChild(wrap);
-    const cb=wrap.querySelector('input[type=checkbox]');
-    const dt=wrap.querySelector('input[type=date]');
-    const toggle=()=>{ hasInteractedGejala=true; dt.style.display = cb.checked ? '' : 'none'; dt.required = cb.checked; if(cb.checked && !dt.value) dt.value=today; updateOnset(); updateDefinisiBadge(); toggleManualOnset(); };
-    cb.addEventListener('change', toggle);
-    dt.addEventListener('change', ()=>{ updateOnset(); updateDefinisiBadge(); });
-  });
-}
-function gejalaCheckedCount(){ let c=0; GEJALA.forEach(g=>{ const cb=document.getElementById('g_'+g.id); if(cb && cb.checked) c++; }); return c; }
-function toggleManualOnset(){ const wrap=document.getElementById('manualOnsetWrap'); if(!wrap) return; const show = hasInteractedGejala && gejalaCheckedCount()===0; wrap.classList.toggle('hidden', !show); }
-function getManualOnsetDate(){ const el=document.getElementById('onsetManual'); if(el && el.value){ try{ return new Date(el.value);}catch(_){ return null; } } return null; }
-
-function initPaparanChecklist(){
-  const grid=document.getElementById('paparanGrid'); grid.innerHTML='';
-  PAPARAN.forEach((p,idx)=>{
-    const wrap=document.createElement('div'); wrap.className="symptom";
-    const id='p_'+idx;
-    wrap.innerHTML=`<input type="checkbox" id="${id}"><label for="${id}" style="margin:0;font-weight:500">${p}</label>`;
-    grid.appendChild(wrap);
-    wrap.querySelector('input[type=checkbox]').addEventListener('change', updateDefinisiBadge);
-  });
-}
-
-// =====================
-// ONSET & DEFINISI
-// =====================
-function getOnsetDate(){
-  let earliest=null;
-  GEJALA.forEach(g=>{
-    const cb=document.getElementById('g_'+g.id);
-    const dt=document.getElementById('d_'+g.id);
-    if(cb && cb.checked && dt && dt.value){
-      const d=new Date(dt.value);
-      if(!earliest || d<earliest) earliest=d;
-    }
-  });
-  if(!earliest){
-    const m=getManualOnsetDate(); if(m) earliest=m;
-  }
-  return earliest;
-}
-function updateOnset(){ const onset=getOnsetDate(); document.getElementById('onsetTag').textContent = onset ? onset.toISOString().slice(0,10) : "—"; }
-function getRadio(name){ return (document.querySelector('input[name="'+name+'"]:checked')?.value)||''; }
-
-function computeDefinisi(){
-  const S={}; GEJALA.forEach(g=>{ S[g.id]=document.getElementById('g_'+g.id)?.checked; });
-  const anyExposure = PAPARAN.some((_,idx)=> document.getElementById('p_'+idx)?.checked );
-  const leuk=parseFloat(document.getElementById('leukosit').value);
-  const trom=parseFloat(document.getElementById('trombosit').value);
-  const bili=parseFloat(document.getElementById('bilirubin').value);
-  const amil=parseFloat(document.getElementById('amilase').value);
-  const cpk =parseFloat(document.getElementById('cpk').value);
-  const proteinuria=document.getElementById('proteinuria')?.checked;
-  const hematuria=document.getElementById('hematuria')?.checked;
-  const rdt=getRadio('rdt'), mat=getRadio('mat'), pcr=getRadio('pcr');
-  const hasFever=!!S.demam; const supportMinor=(S.mialgia||S.malaise||S.conj);
-  const suspek=hasFever&&supportMinor&&anyExposure;
-
-  const severeList=[S.nyeriBetis,S.jaundice,S.anuria,S.perdarahan,S.sesak,S.aritmia,S.batuk,S.ruam];
-  const severeCount=severeList.filter(Boolean).length;
-  const crit1=suspek && severeCount>=2;     // klinis
-  const crit2=(rdt==='pos');               // RDT
-  const labA=(!isNaN(trom)&&trom<100);
-  const labB=(!isNaN(leuk)&&(leuk<3.5||leuk>10.5));
-  const labC=((!isNaN(bili)&&bili>2)||(!isNaN(amil)&&amil>110)||(!isNaN(cpk)&&cpk>200));
-  const labD=(proteinuria||hematuria);
-  const labCount=[labA,labB,labC,labD].filter(Boolean).length;
-  const crit3=suspek && labCount>=3;       // lab komposit
-
-  const probable=(crit1||crit2||crit3);
-  const confirmed=((suspek||probable)&&(mat==='pos'||pcr==='pos'));
-
-  let def="Tidak memenuhi";
-  if(confirmed) def="Confirm";
-  else if(probable) def="Probable";
-  else if(suspek) def="Suspek";
-  return def;
-}
-function updateDefinisiBadge(){
-  const def=computeDefinisi(); const badge=document.getElementById('defBadge');
-  if (!badge) return;
-  badge.textContent="Definisi Kasus: "+def; badge.className='badge';
-  if(def==='Confirm') badge.classList.add('ok');
-  else if(def==='Probable') badge.classList.add('warn');
-  else if(def==='Suspek') badge.classList.add('neutral');
-  else badge.classList.add('bad');
-}
-
-function bindRapidRadioUpdates(){
-  ['rdt','mat','pcr'].forEach(name=>{
-    document.querySelectorAll('input[name="'+name+'"]').forEach(r=>{
-      r.addEventListener('change', updateDefinisiBadge);
-    });
-  });
-}
-
-// =====================
-// FORM HANDLING
-// =====================
-function getFormData(){
-  const onsetDate=getOnsetDate();
-  const gejala={}; const gejalaTgl={};
-  GEJALA.forEach(g=>{ gejala[g.label]=document.getElementById('g_'+g.id).checked; gejalaTgl[g.label]=(document.getElementById('d_'+g.id).value||""); });
-  const paparan=PAPARAN.map((p,idx)=>({label:p,checked:document.getElementById('p_'+idx).checked}));
-  const currUuid = (editingIndex>=0 ? (loadCases()[editingIndex]?.uuid) : null) || editingUUID || genUUID();
-  return {
-    uuid: currUuid,
-    nama:document.getElementById('nama').value,
-    jk:document.getElementById('jk').value,
-    umur:document.getElementById('umur').value,
-    kerja:document.getElementById('kerja').value,
-    prov:document.getElementById('prov').value,
-    kab:document.getElementById('kab').value,
-    alamat:document.getElementById('alamat').value,
-    tglFasyankes: document.getElementById('tglFasyankes').value,
-    gejala, gejalaTgl,
-    onset: onsetDate ? onsetDate.toISOString().slice(0,10) : "",
-    tglPaparan:document.getElementById('tglPaparan').value,
-    paparan,
-    lab:{
-      leukosit:document.getElementById('leukosit').value,
-      trombosit:document.getElementById('trombosit').value,
-      bilirubin:document.getElementById('bilirubin').value,
-      kreatinin:document.getElementById('kreatinin').value,
-      rdt:getRadio('rdt'),
-      mat:getRadio('mat'),
-    },
-    statusAkhir:document.getElementById('statusAkhir').value,
-    tglStatus:document.getElementById('tglStatus').value,
-    definisi:computeDefinisi(),
-    savedAt:new Date().toISOString()
-  };
-}
-
-function resetForm(){
-  hasInteractedGejala=false;
-  document.querySelector('.form-column').querySelectorAll('input,select,textarea').forEach(el=>{
-    if(el.type==='checkbox'||el.type==='radio') el.checked=false; else el.value='';
-  });
-  initProvKab(); initGejalaChecklist(); initPaparanChecklist();
-  toggleManualOnset(); updateOnset(); updateDefinisiBadge();
-}
-
-function loadCaseIntoForm(d){
-  editingUUID = d.uuid || null;
-  document.getElementById('nama').value = d.nama||'';
-  document.getElementById('jk').value = d.jk||'';
-  document.getElementById('umur').value = d.umur||'';
-  document.getElementById('kerja').value = d.kerja||'';
-  document.getElementById('prov').value = d.prov||''; document.getElementById('prov').dispatchEvent(new Event('change'));
-  setTimeout(()=>{ document.getElementById('kab').value = d.kab||''; }, 0);
-  document.getElementById('alamat').value = d.alamat||'';
-  document.getElementById('tglFasyankes').value = d.tglFasyankes||'';
-
-  initGejalaChecklist();
-  Object.entries(d.gejala||{}).forEach(([label,checked])=>{
-    const g = GEJALA.find(x => x.label === label);
-    if(g){
-      const cb = document.getElementById('g_'+g.id);
-      const dt = document.getElementById('d_'+g.id);
-      if(cb){ cb.checked = !!checked; }
-      const tgl = (d.gejalaTgl||{})[label] || '';
-      if(dt){ if(cb.checked){ dt.style.display=''; dt.value = tgl; } else { dt.style.display='none'; dt.value = ''; } }
-    }
-  });
-  toggleManualOnset(); updateOnset();
-
-  initPaparanChecklist();
-  (d.paparan||[]).forEach((p,idx)=>{ const el = document.getElementById('p_'+idx); if(el) el.checked = !!p.checked; });
-
-  const Lb=d.lab||{};
-  const setVal=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=(v??''); };
-  ['leukosit','trombosit','bilirubin','kreatinin'].forEach(id=> setVal(id, Lb[id]));
-  const setRadio=(name,v)=>{ const el=document.querySelector(`input[name="${name}"][value="${v}"]`); if(el) el.checked=true; };
-  setRadio('rdt', Lb.rdt||'nd'); setRadio('mat', Lb.mat||'nd');
-
-  document.getElementById('statusAkhir').value=d.statusAkhir||'';
-  document.getElementById('tglStatus').value=d.tglStatus||'';
-
-  updateDefinisiBadge(); bindRapidRadioUpdates();
-  document.getElementById('simpan').textContent = 'Update Kasus';
-  document.body.classList.add('editing');
-  window.scrollTo({top:0, behavior:'smooth'});
-}
-
-function cancelEdit(){ 
-  editingIndex=-1; 
-  editingUUID=null; 
-  document.getElementById('simpan').textContent='Simpan Kasus'; 
-  document.body.classList.remove('editing'); 
-  resetForm(); 
-}
-
-// =====================
-// RENDERING FUNCTIONS
-// =====================
-function valueOrDash(v){ return (v===undefined||v===null||String(v).trim()==='') ? '—' : v; }
-
-function calculateAndRenderCFR() {
-  const data = loadCases();
-  const total = data.length;
-  if (total === 0) {
-    document.getElementById('cfrDisplay').textContent = 'CFR: 0%';
-    return;
-  }
-  const meninggal = data.filter(d => d.statusAkhir === 'Meninggal').length;
-  const cfr = (meninggal / total) * 100;
-  document.getElementById('cfrDisplay').textContent = `CFR: ${cfr.toFixed(2)}%`;
-}
-
-function renderCounts(){
-  const data=loadCases(); 
-  const counts={Suspek:0,Probable:0,Confirm:0,Other:0};
-  data.forEach(d=>{
-    if(d.definisi==='Suspek') counts.Suspek++;
-    else if(d.definisi==='Probable') counts.Probable++;
-    else if(d.definisi==='Confirm') counts.Confirm++;
-    else counts.Other++;
-  });
-  const box=document.getElementById('counts'); box.innerHTML='';
-  Object.entries(counts).forEach(([k,v])=>{
-    const span=document.createElement('span');
-    const cls=k==='Confirm'?'ok':(k==='Probable'?'warn':(k==='Suspek'?'':'bad'));
-    span.className='tag '+cls;
-    span.textContent=`${k}: ${v}`;
-    box.appendChild(span);
-  });
-  calculateAndRenderCFR();
-}
-
-function defClass(def){ 
-  if(def==='Confirm') return 'ok'; 
-  if(def==='Probable') return 'warn'; 
-  if(def==='Suspek') return ''; 
-  return 'bad'; 
-}
-
-function renderTable(){
-  const tbody=document.querySelector('#casesTable tbody'); 
-  tbody.innerHTML='';
-  const data=loadCases();
-  
-  data.forEach((d,i)=>{
-    const nameCell = valueOrDash(d.nama);
-    const umurCell = valueOrDash(d.umur);
-    const jkCell = valueOrDash(d.jk).charAt(0);
-    const onsetCell = valueOrDash(d.onset);
-    const statusCell = valueOrDash(d.statusAkhir);
-    const defCell = d.definisi || 'Tidak memenuhi';
-    const defCls = defClass(defCell);
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${nameCell}</td>
-      <td>${umurCell}</td>
-      <td>${jkCell}</td>
-      <td>${onsetCell}</td>
-      <td>${statusCell}</td>
-      <td><span class="tag ${defCls}">${defCell}</span></td>
-      <td>
-        <button class="btn small info" data-edit="${i}">Edit</button> 
-        <button class="btn small danger" data-del="${i}">Hapus</button>
-      </td>`;
-    tbody.appendChild(tr);
-  });
-  
-  tbody.querySelectorAll('button[data-edit]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{ 
-      const i=+btn.dataset.edit; 
-      const arr=loadCases(); 
-      editingIndex=i; 
-      loadCaseIntoForm(arr[i]); 
-    });
-  });
-  
-  tbody.querySelectorAll('button[data-del]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{ 
-      const i=+btn.dataset.del; 
-      if (!confirm('Yakin ingin menghapus kasus ini?')) return;
-      
-      const arr=loadCases(); 
-      arr.splice(i,1); 
-      saveCases(arr); 
-      renderAll();
-      
-      if (AUTO_SYNC_ENABLED && syncStatus.isOnline) {
+function \1calculateAndRenderCFR(); if (AUTO_SYNC_ENABLED && syncStatus.isOnline) {
         setTimeout(scheduleAutoPull, 1000);
       }
     });
@@ -544,10 +221,7 @@ function setupActionButtons() {
         arr.push(data);
       }
       
-      if (saveCases(arr)) {
-        cancelEdit();
-        renderAll();
-        alert('Kasus disimpan.');
+      if (\1calculateAndRenderCFR(); alert('Kasus disimpan.');
         
         if (AUTO_SYNC_ENABLED && syncStatus.isOnline) {
           setTimeout(scheduleAutoPull, 500);
@@ -602,9 +276,7 @@ function setupActionButtons() {
       }
 
       if (confirm(`Menemukan ${removed} duplikat. Hapus?`)) {
-          saveCases(result);
-          renderAll();
-          alert(`Menghapus ${removed} duplikat.`);
+          \1calculateAndRenderCFR(); alert(`Menghapus ${removed} duplikat.`);
           if (AUTO_SYNC_ENABLED && syncStatus.isOnline) {
             setTimeout(scheduleAutoPull, 1000);
           }
@@ -672,14 +344,17 @@ function updateCharts(){
   kabChart.update();
   
   // Umur Chart
-  const ageGroups = { '0-4':0, '5-14':0, '15-44':0, '45-64':0, '65+':0, 'N/A':0 };
+  const ageGroups = { '0-4':0, '5-14':0, '15-24':0, '25-34':0, '35-44':0, '45-54':0, '55-64':0, '65+':0, 'N/A':0 };
   filtered.forEach(d => {
     const age = parseInt(d.umur, 10);
     if (isNaN(age)) { ageGroups['N/A']++; }
     else if (age <= 4) { ageGroups['0-4']++; }
     else if (age <= 14) { ageGroups['5-14']++; }
-    else if (age <= 44) { ageGroups['15-44']++; }
-    else if (age <= 64) { ageGroups['45-64']++; }
+    else if (age <= 24) { ageGroups['15-24']++; }
+    else if (age <= 34) { ageGroups['25-34']++; }
+    else if (age <= 44) { ageGroups['35-44']++; }
+    else if (age <= 54) { ageGroups['45-54']++; }
+    else if (age <= 64) { ageGroups['55-64']++; }
     else { ageGroups['65+']++; }
   });
   umurChart.data.labels = Object.keys(ageGroups);
@@ -766,7 +441,7 @@ function recalcCasesFromLocalAndRefresh(){ const counts=recalcCasesByProvinceFro
 // EKSPOR EXCEL
 // =====================
 function flattenCase(d){
-  const row={ 'UUID':d.uuid||'', 'Nama':d.nama,'Jenis Kelamin':d.jk,'Umur':d.umur,'Pekerjaan':d.kerja,'Provinsi':d.prov,'Kab/Kota':d.kab,'Alamat':d.alamat,'Tgl Fasyankes':d.tglFasyankes,'Onset':d.onset,'Tanggal Paparan':d.tglPaparan,'Definisi':d.definisi,'Status Akhir':d.statusAkhir,'Tanggal Status':d.tglStatus,'Saved At':d.savedAt };
+  const row={ 'UUID':d.uuid||'', 'Nama':d.nama,'Jenis Kelamin':d.jk,'Umur':d.umur,'Pekerjaan':d.kerja,'Provinsi':d.prov,'Kab/Kota':d.kab,'Alamat':d.alamat,'Onset':d.onset,'Definisi':d.definisi,'Status Akhir':d.statusAkhir,'Tanggal Status':d.tglStatus,'Saved At':d.savedAt };
   GEJALA.forEach(g=>{ const label=g.label; row['Gejala: '+label]=d.gejala[label]?'Ya':''; row['Tgl '+label]=d.gejalaTgl[label]||''; });
   row['Paparan (2 minggu)']=(d.paparan||[]).filter(x=>x.checked).map(x=>x.label).join('; ');
   const Lb=d.lab||{}; 
@@ -802,9 +477,9 @@ function flatToCase(r){
     prov: r['Provinsi']||'',
     kab: r['Kab/Kota']||'',
     alamat: r['Alamat']||'',
-    tglFasyankes: r['Tgl Fasyankes']||'',
+    
     onset: r['Onset']||'',
-    tglPaparan: r['Tanggal Paparan']||'',
+    
     gejala: {}, gejalaTgl: {}, paparan: [],
     lab: {
       leukosit: r['Leukosit (x10^3/µL)']||'',
@@ -856,140 +531,8 @@ async function pullFromSheets(opts={merge:true, silent:false}){
     if(opts.merge){
       const local = loadCases();
       const merged = mergeCases(local, remoteCases);
-      saveCases(merged);
-    } else {
-      saveCases(remoteCases);
-    }
-    renderAll();
-    updateSyncStatus('Tarik data dari G-Sheet berhasil.');
-    if(!opts.silent) alert('Data dari Google Sheet sudah dimuat/di-merge.');
-  }catch(e){
-    console.error('pullFromSheets error', e);
-    updateSyncStatus('Gagal tarik data (cek publish Sheet & ID)', true);
-    if(!opts.silent) alert('Gagal menarik data dari Google Sheet. Pastikan Sheet di-publish ke web.');
-  }
-}
-
-async function sendAllToSheets(silent = false){
-  if(!SHEETS_URL){ if(!silent) alert('SHEETS_URL belum diisi.'); return; }
-  ensureUUIDs();
-  let arr = loadCases();
-  if(!arr.length){ if(!silent) alert('Tidak ada data lokal untuk dikirim.'); return; }
-  
-  const localByKey = new Map();
-  const toDate = s => { try{ return new Date(s); }catch(_){ return new Date(0);} };
-  for(const d of arr){
-    const k=getKey(d);
-    if(!localByKey.has(k)) localByKey.set(k, d);
-    else {
-      const a=localByKey.get(k);
-      const tA=toDate(a.savedAt||a.tglStatus||a.onset||'1970-01-01');
-      const tB=toDate(d.savedAt||d.tglStatus||d.onset||'1970-01-01');
-      if(tB>tA) localByKey.set(k, d);
-    }
-  }
-  let toSend = Array.from(localByKey.values());
-
-  try{
-    updateSyncStatus('Mengecek data di G-Sheet...');
-    const remote = await readSheetCases();
-    const remoteKeys = new Set(remote.map(getKey));
-    toSend = toSend.filter(d => !remoteKeys.has(getKey(d)));
-  }catch(e){
-    console.warn('Gagal cek duplikat dari Sheet (GViz tidak tersedia):', e);
-  }
-  
-  if(toSend.length === 0){
-    if(!silent) alert('Tidak ada baris data baru untuk dikirim.');
-    updateSyncStatus('Semua data sudah sinkron.');
-    return;
-  }
-
-  try{
-    updateSyncStatus(`Mengirim ${toSend.length} baris baru...`);
-    await fetch(SHEETS_URL, {
-      method: 'POST', mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ token: ACCESS_TOKEN, action: 'appendBatch', rows: toSend.map(flattenCase) })
-    });
-    if(!silent) alert(`Permintaan sync dikirim: ${toSend.length} baris baru.`);
-    updateSyncStatus('Pengiriman data ke G-Sheet berhasil.');
-  }catch(e){ 
-      if(!silent) alert('Gagal sync: '+e); 
-      updateSyncStatus('Gagal mengirim data.', true);
-  }
-}
-
-async function sendReplaceAllToSheets(){
-  if(!SHEETS_URL){ alert('SHEETS_URL belum diisi.'); return; }
-  ensureUUIDs();
-  let arr = loadCases();
-  if(!arr.length){ alert('Tidak ada data lokal untuk disinkronkan.'); return; }
-
-  const byKey = new Map();
-  const toDate = s => { try{ return new Date(s); }catch(_){ return new Date(0);} };
-  for(const d of arr){
-    const k = getKey(d);
-    if(!byKey.has(k)){ byKey.set(k, d); }
-    else {
-      const a = byKey.get(k);
-      const tA = toDate(a.savedAt||a.tglStatus||a.onset||'1970-01-01');
-      const tB = toDate(d.savedAt||d.tglStatus||d.onset||'1970-01-01');
-      if(tB > tA) byKey.set(k, d);
-    }
-  }
-  const uniqueLatest = Array.from(byKey.values());
-  const ok = confirm(`PERINGATAN: Tindakan ini akan MENGGANTI seluruh isi sheet dengan ${uniqueLatest.length} baris dari aplikasi ini.\nLanjutkan?`);
-  if(!ok) return;
-
-  try{
-    updateSyncStatus(`Mengirim ${uniqueLatest.length} baris (replace)...`);
-    await fetch(SHEETS_URL, {
-      method: 'POST', mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ token: ACCESS_TOKEN, action: 'replaceAll', rows: uniqueLatest.map(flattenCase) })
-    });
-    alert('Permintaan Full Sync (Replace All) dikirim. Periksa Google Sheet Anda.');
-    updateSyncStatus('Full Sync (Replace All) berhasil dikirim.');
-  }catch(e){
-    alert('Gagal Full Sync: '+e);
-    updateSyncStatus('Gagal Full Sync.', true);
-  }
-}
-
-let _autoTimer = null;
-async function scheduleAutoPull(){
-  if(!AUTO_SYNC_ENABLED) return;
-  await pullFromSheets({merge:true, silent:true});
-  if(_autoTimer) clearInterval(_autoTimer);
-  _autoTimer = setInterval(()=>pullFromSheets({merge:true, silent:true}), AUTO_SYNC_INTERVAL_MS);
-}
-
-
-// =====================
-// INITIALIZATION & TOKEN
-// =====================
-
-function initApp() {
-    // Auto-update form logic on input
-    const _root=document.querySelector('.form-column');
-    const _autoUpd = () => { updateOnset(); updateDefinisiBadge(); toggleManualOnset(); };
-    _root.addEventListener('input', _autoUpd, true);
-    _root.addEventListener('change', _autoUpd, true);
-
-    // Initial UI setup and data rendering
-    _bindHeaderShadow(); 
-    _syncTimeModeUI();
-    document.getElementById('fTimeMode')?.addEventListener('change', _syncTimeModeUI);
-
-    initGejalaChecklist(); 
-    initPaparanChecklist();
-    updateOnset(); 
-    updateDefinisiBadge(); 
-    ensureUUIDs(); 
-    renderAll(); 
-    bindRapidRadioUpdates();
-    setupActionButtons();
+      \1calculateAndRenderCFR(); bindRapidRadioUpdates(); bindDefinisiRealtime();
+    setupActionButtons(); _bindHeaderShadow();
 
     // Map and chart event listeners
     document.getElementById('applyFilter').addEventListener('click', updateCharts);
@@ -1104,3 +647,12 @@ function initApp() {
   
   window.__leptoToken={ verifyToken, showLock, afterUnlock };
 })();
+function bindDefinisiRealtime(){
+  ['leukosit','trombosit','bilirubin','amilase','cpk'].forEach(id=>{
+    const el=document.getElementById(id); if(el){ el.addEventListener('input', updateDefinisiBadge); }
+  });
+  ['proteinuria','hematuria'].forEach(id=>{
+    const el=document.getElementById(id); if(el){ el.addEventListener('change', updateDefinisiBadge); }
+  });
+}
+
