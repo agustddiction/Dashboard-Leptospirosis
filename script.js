@@ -375,21 +375,46 @@ function buildGejalaGrid() {
     div.innerHTML = `
       <input type="checkbox" id="${g.id}"/>
       <label for="${g.id}" style="margin:0; flex:1">${g.label}</label>
-      <input id="${g.id}Tgl" type="date" style="width:140px"/>
+      <input id="${g.id}Tgl" type="date" style="width:140px; display:none"/>
     `;
     grid.appendChild(div);
     
     const cb = div.querySelector('input[type="checkbox"]');
     const dt = div.querySelector('input[type="date"]');
     cb.addEventListener('change', () => {
-      dt.disabled = !cb.checked;
-      if (!cb.checked) dt.value = '';
+      if (cb.checked) {
+        dt.style.display = '';
+      } else {
+        dt.style.display = 'none';
+        dt.value = '';
+      }
       updateOnsetTag();
       updateDefinisiBadge();
+      checkManualOnsetVisibility();
     });
-    dt.addEventListener('change', updateOnsetTag);
-    dt.disabled = true;
+    dt.addEventListener('change', () => {
+      updateOnsetTag();
+      checkManualOnsetVisibility();
+    });
   });
+  
+  checkManualOnsetVisibility();
+}
+
+function checkManualOnsetVisibility() {
+  const anyChecked = GEJALA.some(g => {
+    const cb = document.getElementById(g.id);
+    return cb && cb.checked;
+  });
+  
+  const manualWrap = document.getElementById('manualOnsetWrap');
+  if (manualWrap) {
+    if (anyChecked) {
+      manualWrap.classList.add('hidden');
+    } else {
+      manualWrap.classList.remove('hidden');
+    }
+  }
 }
 
 function buildPaparanGrid() {
