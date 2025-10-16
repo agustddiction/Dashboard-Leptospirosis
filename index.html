@@ -76,9 +76,9 @@
       <h2>Riwayat Gejala</h2>
       <div class="muted small">Centang gejala yang muncul. Jika dicentang, isi tanggal munculnya gejala. Onset otomatis diambil dari tanggal gejala paling awal.</div>
       <div class="grid-2" id="gejalaGrid"></div>
-      <div id="manualOnsetWrap" class="row hidden" style="margin-top:8px">
-        
-        </div>
+      <div id="manualOnsetWrap" class="row" style="margin-top:8px">
+        <label for="onsetManual" class="muted" style="margin:0">Tanggal onset (manual) — gunakan ini jika tidak memilih tanggal gejala</label>
+        <input id="onsetManual" type="date" style="margin-left:auto" />
       </div>
       <div class="hr"></div>
       <div class="row">
@@ -195,6 +195,10 @@
         </div>
         
         <div>
+          <label>Tanggal Status</label>
+          <input id="tglStatus" type="date"/>
+        </div>
+        <div>
           <label>Pemberian Obat</label>
           <input id="obat" type="text" placeholder="cth: Doksisiklin, Penicillin, dll."/>
         </div>
@@ -203,9 +207,9 @@
 
     <section id="aksi">
       <div class="row">
-        <button class="btn primary" id="simpan">Simpan Kasus</button>
-        <button class="btn" id="cancelEdit">Batal Edit</button>
-        <button class="btn warning" id="reset">Reset Form</button>
+        <button class="btn primary" id="simpan" type="button">Simpan Kasus</button>
+        <button class="btn" id="cancelEdit" type="button">Batal Edit</button>
+        <button class="btn warning" id="reset" type="button">Reset Form</button>
         <span class="right"></span>
         <button class="btn info" id="cekDup">Cek Duplikat</button>
         <button class="btn info" id="hapusDup">Hapus Duplikat</button>
