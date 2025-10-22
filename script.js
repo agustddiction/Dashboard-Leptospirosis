@@ -797,6 +797,48 @@ async function sendAllToSheets(replace=false){
   try{
     updateSyncStatus('Mengirim data ke Google Sheets...');
     const rows=arr.map(flattenCase);
+
+    // Payload disesuaikan dengan Google Apps Script doPost(e)
+    const payload = {
+      token: ACCESS_TOKEN,
+      action: replace ? 'appendBatch' : 'appendBatch',
+      rows: rows
+    };
+
+    // Gunakan text/plain agar menghindari preflight CORS di Apps Script
+    const res = await fetch(SHEETS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+      mode: 'cors',
+      cache: 'no-store'
+    });
+
+    const text = await res.text();
+    let result;
+    try { result = JSON.parse(text); } catch(_){ throw new Error('Respon bukan JSON: ' + text.slice(0,200)); }
+
+    if(result && result.ok){
+      const cnt = typeof result.count === 'number' ? result.count : rows.length;
+      updateSyncStatus(`Berhasil kirim ke Sheets (${cnt} baris)`);
+      alert('Data berhasil dikirim ke Google Sheets');
+    } else {
+      throw new Error((result && (result.error || result.message)) || 'Gagal mengirim data');
+    }
+  }catch(err){
+    updateSyncStatus('Gagal kirim: '+err.message, true);
+    alert('Gagal mengirim ke Sheets: '+err.message);
+  }
+}
+
+async function sendReplaceAllToSheets(){
+  if(!confirm('Ini akan MENGGANTI SEMUA data di Google Sheets dengan data lokal. Lanjutkan?')) return;
+  await sendAllToSheets(true);
+}
+  const arr=loadCases(); if(arr.length===0){ alert('Tidak ada data untuk dikirim.'); return; }
+  try{
+    updateSyncStatus('Mengirim data ke Google Sheets...');
+    const rows=arr.map(flattenCase);
     const res=await fetch(SHEETS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:replace?'replaceAll':'append',data:rows})});
     const result=await res.json();
     if(result.status==='success'){ updateSyncStatus('Berhasil kirim ke Sheets'); alert('Data berhasil dikirim ke Google Sheets'); }
