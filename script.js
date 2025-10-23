@@ -797,15 +797,11 @@ async function sendAllToSheets(replace=false){
   try{
     updateSyncStatus('Mengirim data ke Google Sheets...');
     const rows=arr.map(flattenCase);
-
-    // Payload disesuaikan dengan Google Apps Script doPost(e)
     const payload = {
       token: ACCESS_TOKEN,
-      action: replace ? 'appendBatch' : 'appendBatch',
+      action: replace ? 'replaceAll' : 'appendBatch',
       rows: rows
     };
-
-    // Gunakan text/plain agar menghindari preflight CORS di Apps Script
     const res = await fetch(SHEETS_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -813,11 +809,9 @@ async function sendAllToSheets(replace=false){
       mode: 'cors',
       cache: 'no-store'
     });
-
     const text = await res.text();
     let result;
     try { result = JSON.parse(text); } catch(_){ throw new Error('Respon bukan JSON: ' + text.slice(0,200)); }
-
     if(result && result.ok){
       const cnt = typeof result.count === 'number' ? result.count : rows.length;
       updateSyncStatus(`Berhasil kirim ke Sheets (${cnt} baris)`);
@@ -835,23 +829,7 @@ async function sendReplaceAllToSheets(){
   if(!confirm('Ini akan MENGGANTI SEMUA data di Google Sheets dengan data lokal. Lanjutkan?')) return;
   await sendAllToSheets(true);
 }
-  const arr=loadCases(); if(arr.length===0){ alert('Tidak ada data untuk dikirim.'); return; }
-  try{
-    updateSyncStatus('Mengirim data ke Google Sheets...');
-    const rows=arr.map(flattenCase);
-    const res=await fetch(SHEETS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:replace?'replaceAll':'append',data:rows})});
-    const result=await res.json();
-    if(result.status==='success'){ updateSyncStatus('Berhasil kirim ke Sheets'); alert('Data berhasil dikirim ke Google Sheets'); }
-    else { throw new Error(result.message||'Gagal'); }
-  }catch(err){
-    updateSyncStatus('Gagal kirim: '+err.message, true);
-    alert('Gagal mengirim ke Sheets: '+err.message);
-  }
-}
-async function sendReplaceAllToSheets(){
-  if(!confirm('Ini akan mengganti SEMUA data di Google Sheets dengan data lokal. Lanjutkan?')) return;
-  await sendAllToSheets(true);
-}
+
 let autoPullTimer = null;
 function scheduleAutoPull() {
   if (!AUTO_SYNC_ENABLED || !syncStatus.isOnline) return;
@@ -865,6 +843,7 @@ function scheduleAutoPull() {
     scheduleAutoPull();
   }, AUTO_SYNC_INTERVAL_MS);
 }
+
 async function initMap() {
   try {
     const geojson = await loadFromUrl(DEFAULT_GH);
@@ -875,6 +854,7 @@ async function initMap() {
     document.getElementById('mapMsg').textContent = 'Gagal memuat peta. Periksa koneksi internet.';
   }
 }
+
 function bindDefinisiRealtime(){
   ['leukosit','trombosit','bilirubin','amilase','cpk'].forEach(id=>{
     const el=document.getElementById(id);
@@ -885,6 +865,7 @@ function bindDefinisiRealtime(){
     if(el){ el.addEventListener('change', updateDefinisiBadge); }
   });
 }
+
 function initApp() {
   buildGejalaGrid();
   buildPaparanGrid();
@@ -914,67 +895,142 @@ function initApp() {
   }, 500);
   scheduleAutoPull();
 }
+
+// =====================
+// TOKEN PROTECTION (FIXED)
+// =====================
 (function(){
   const OK_KEY = 'lepto_token_ok';
-  function hasOk(){ try{ return localStorage.getItem(OK_KEY)==='1'; }catch(_){ return false; } }
-  let unlocked=false;
-  function hideLock(){
-    const el=document.getElementById('lock');
-    if(el){ el.remove(); document.body.classList.remove('locked'); }
+  let unlocked = false;
+  
+  function hasOk(){ 
+    try{ 
+      return localStorage.getItem(OK_KEY) === '1'; 
+    } catch(_) { 
+      return false; 
+    } 
   }
+  
+  function setOk(){
+    try{ 
+      localStorage.setItem(OK_KEY, '1'); 
+      return true;
+    } catch(_) { 
+      return false; 
+    }
+  }
+  
+  function hideLock(){
+    const el = document.getElementById('lock');
+    if(el){ 
+      el.style.display = 'none';
+      document.body.classList.remove('locked'); 
+    }
+  }
+  
   function showLock(){
-    const el=document.getElementById('lock');
+    const el = document.getElementById('lock');
     if(!el) return;
     document.body.classList.add('locked');
     el.style.display = 'flex';
-    document.getElementById('tokenInput')?.focus();
+    const input = document.getElementById('tokenInput');
+    if(input) {
+      input.value = '';
+      setTimeout(() => input.focus(), 100);
+    }
   }
-  function bindHandlers(){
-    const form=document.getElementById('lockForm');
-    const err=document.getElementById('lockErr');
-    const handleSubmit = (e) => { e.preventDefault(); verifyToken(); };
-    if(err) err.style.display='none';
-    if(form) form.addEventListener('submit', handleSubmit);
-  }
+  
   function afterUnlock(){
     if(unlocked) return;
-    unlocked=true;
+    unlocked = true;
+    console.log('✓ Token verified, initializing app...');
     hideLock();
     initApp();
   }
+  
   function verifyToken(){
-    const val=(document.getElementById('tokenInput')?.value||'').trim();
-    const err=document.getElementById('lockErr');
-    if(val===ACCESS_TOKEN){
-      try{ localStorage.setItem(OK_KEY,'1'); }catch(_){ }
-      afterUnlock();
+    const input = document.getElementById('tokenInput');
+    const err = document.getElementById('lockErr');
+    const val = (input?.value || '').trim();
+    
+    if(err) err.style.display = 'none';
+    
+    if(val === ACCESS_TOKEN){
+      if(setOk()){
+        afterUnlock();
+      } else {
+        if(err){ 
+          err.textContent = 'Gagal menyimpan token. Coba lagi.'; 
+          err.style.display = 'block'; 
+        }
+      }
     } else {
-      if(err){ err.textContent='Token salah. Coba lagi.'; err.style.display='block'; }
+      if(err){ 
+        err.textContent = 'Token salah. Coba lagi.'; 
+        err.style.display = 'block'; 
+      }
+      if(input) {
+        input.value = '';
+        input.focus();
+      }
     }
   }
+  
+  function bindHandlers(){
+    const form = document.getElementById('lockForm');
+    const err = document.getElementById('lockErr');
+    
+    if(err) err.style.display = 'none';
+    
+    if(form) {
+      form.addEventListener('submit', (e) => { 
+        e.preventDefault(); 
+        verifyToken(); 
+      });
+    }
+    
+    const btn = document.getElementById('unlockBtn');
+    if(btn) {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        verifyToken();
+      });
+    }
+  }
+  
   function autoUnlockFromURL(){
     try{
-      const sp=new URLSearchParams(location.search);
-      const t=sp.get('token');
-      const skip=sp.get('skipToken')==='1';
-      if(skip || t===ACCESS_TOKEN){
-        try{ localStorage.setItem(OK_KEY,'1'); }catch(_){ }
+      const sp = new URLSearchParams(location.search);
+      const t = sp.get('token');
+      const skip = sp.get('skipToken') === '1';
+      
+      if(skip || t === ACCESS_TOKEN){
+        setOk();
         afterUnlock();
         return true;
       }
-    }catch(_){}
+    } catch(_) {}
     return false;
   }
+  
   function start(){
     bindHandlers();
+    
     if(autoUnlockFromURL()) return;
-    if(hasOk()){ afterUnlock(); return; }
+    
+    if(hasOk()){ 
+      afterUnlock(); 
+      return; 
+    }
+    
     showLock();
   }
+  
   if(document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', start);
   } else {
     start();
   }
-  window.__leptoToken={ verifyToken, showLock, afterUnlock };
+  
+  window.__leptoToken = { verifyToken, showLock, afterUnlock };
 })();
