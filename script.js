@@ -215,7 +215,13 @@ function renderTable() {
 }
 
 function getFormData() {
-  const gejala = {};
+  
+  // normalize common date fields (added)
+  try{
+    var onsetEl = document.getElementById('onsetManual'); if(onsetEl) onsetEl.value = toISODate(onsetEl.value);
+    var tglStatusEl = document.getElementById('tglStatus'); if(tglStatusEl) tglStatusEl.value = toISODate(tglStatusEl.value);
+  }catch(_){}
+const gejala = {};
   const gejalaTgl = {};
   GEJALA.forEach(g => {
     const cb = document.getElementById(g.id);
@@ -404,6 +410,8 @@ function updateOnsetTag() {
 }
 
 function resetForm() {
+  try{ setInputTanggalData(''); }catch(_){}
+
   document.getElementById('nama').value = '';
   document.getElementById('jk').value = '';
   document.getElementById('umur').value = '';
@@ -672,9 +680,10 @@ async function loadFromUrl(url){
     if(!res.ok) throw new Error('status '+res.status);
     return await res.json();
   }catch(err){
-    document.getElementById('mapMsg').textContent = 'Gagal memuat GeoJSON dari GitHub: '+err;
-    throw err;
-  }
+  const msg = (err && err.message) ? String(err.message).slice(0,200) : (err ? String(err).slice(0,200) : "Unknown error");
+  try{ updateSyncStatus("Gagal kirim ke Sheets: " + msg, true); }catch(_){}
+  try{ alert("Gagal kirim ke Sheets: " + msg); }catch(_){}
+}
 }
 function renderChoropleth(geojson){
   ensureMap();
@@ -699,7 +708,9 @@ function recalcCasesByProvinceFromLocal(){ const arr=loadCases(); const counts={
 function recalcCasesFromLocalAndRefresh(){ const counts=recalcCasesByProvinceFromLocal(); if(Object.keys(counts).length){ casesByProvince=counts; refreshChoropleth(); } }
 
 function flattenCase(d){
-  const row={ 'UUID':d.uuid||'', 'Nama':d.nama,'Jenis Kelamin':d.jk,'Umur':d.umur,'Pekerjaan':d.kerja,'Provinsi':d.prov,'Kab/Kota':d.kab,'Alamat':d.alamat,'Onset':d.onset,'Definisi':d.definisi,'Status Akhir':d.statusAkhir,'Tanggal Status':d.tglStatus,'Saved At':d.savedAt };
+  const row={
+    'Saved At': (d && d.savedAt ? d.savedAt : ''),
+    'Tanggal Input Data': (d && d.savedAt ? toLocalDateTime(d.savedAt) : ''), 'UUID':d.uuid||'', 'Nama':d.nama,'Jenis Kelamin':d.jk,'Umur':d.umur,'Pekerjaan':d.kerja,'Provinsi':d.prov,'Kab/Kota':d.kab,'Alamat':d.alamat,'Onset':d.onset,'Definisi':d.definisi,'Status Akhir':d.statusAkhir,'Tanggal Status':d.tglStatus,'Saved At':d.savedAt };
   GEJALA.forEach(g=>{ const label=g.label; row['Gejala: '+label]=d.gejala[label]?'Ya':''; row['Tgl '+label]=d.gejalaTgl[label]||''; });
   row['Paparan (2 minggu)']=(d.paparan||[]).filter(x=>x.checked).map(x=>x.label).join('; ');
   const Lb=d.lab||{};
@@ -1034,3 +1045,15 @@ function initApp() {
   
   window.__leptoToken = { verifyToken, showLock, afterUnlock };
 })();
+
+/** Fast recalc for Definisi Kasus when lab values change (added) */
+function bindLabFastRecalc(){
+  ['leukosit','trombosit','bilirubin','sgot','sgpt','kreatinin','amilase','cpk','rdt','mat']
+    .forEach(function(id){
+      var el=document.getElementById(id);
+      if(el){
+        el.addEventListener('input', function(){ try{ if(typeof updateDefinisiBadge==='function') updateDefinisiBadge(); }catch(_){} });
+        el.addEventListener('change', function(){ try{ if(typeof updateDefinisiBadge==='function') updateDefinisiBadge(); }catch(_){}});
+      }
+    });
+}
