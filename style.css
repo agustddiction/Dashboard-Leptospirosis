@@ -10,7 +10,7 @@ body{ margin:0; background:var(--bg); color:var(--fg);
 a{ color:inherit }
 
 /* Sticky header with dynamic shadow */
-header{ position:sticky; top:0; background:rgba(255,255,255,.96); border-bottom:1px solid var(--line); backdrop-filter:saturate(160%) blur(8px); z-index:20; transition: box-shadow .2s ease, transform .2s ease }
+header{ }
 header.scrolled{ box-shadow:0 10px 24px rgba(0,0,0,.08); transform:translateY(0) }
 
 .wrap{ max-width:980px; margin:0 auto; padding:14px 18px }
@@ -59,7 +59,7 @@ textarea{ min-height:70px; resize:vertical }
 .chart-card canvas{ width:100% !important; height:auto !important; aspect-ratio: 16 / 9; }
 
 /* Filters: proporsional & sticky */
-.sticky-filters{ position:sticky; top:64px; z-index:10; background:#fff; border:1px solid var(--line); border-radius:12px; padding:10px; }
+.sticky-filters{  top:64px; z-index:10; background:#fff; border:1px solid var(--line); border-radius:12px; padding:10px; }
 .filters-grid{
   display:grid;
   grid-template-columns: 180px 1fr 1fr auto; /* mode waktu | rentang | rentang/Prov-Kab | tombol */
@@ -89,7 +89,7 @@ textarea{ min-height:70px; resize:vertical }
 
 /* Lock overlay */
 body.locked{ overflow:hidden }
-.lock{ position:fixed; inset:0; z-index:9999; background:rgba(255,255,255,.96);
+.lock{  inset:0; z-index:9999; background:rgba(255,255,255,.96);
   display:flex; align-items:center; justify-content:center; padding:24px }
 .lock-card{ width:100%; max-width:460px; border:1px solid var(--line); border-radius:16px; padding:20px; background:#fff; box-shadow:0 10px 30px rgba(0,0,0,.06) }
 .lock-title{ font-size:18px; font-weight:700; margin:0 0 6px }
@@ -123,7 +123,7 @@ body.locked{ overflow:hidden }
 
 /* Sticky header for cases table */
 #casesTable thead th {
-  position: sticky;
+  
   top: 0;
   background: #fff;
   z-index: 5;
@@ -131,8 +131,8 @@ body.locked{ overflow:hidden }
 
 
 /* Sticky header on scroll */
-header{ position:sticky; top:0; background:rgba(255,255,255,.96); border-bottom:1px solid var(--line); backdrop-filter:saturate(160%) blur(8px); z-index:20; transition: box-shadow .2s ease, transform .2s ease }
-header .container, header .wrap{ position: relative; }
+header{ }
+header .container, header .wrap{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
 
 
 header{ transform: translateY(0); }
@@ -148,7 +148,7 @@ header{ transform: translateY(0); }
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05);box-shadow:0 0 8px rgba(0,0,0,.2)}}
 
 .def-status-fixed{
-  position: fixed;
+  
   right: 16px;
   bottom: 16px;
   display: flex;
@@ -169,3 +169,44 @@ header{ transform: translateY(0); }
 .badge.suspek{ background:#f59e0b; border-color:#f59e0b; color:#111827 }
 .badge.probable{ background:#fb923c; border-color:#fb923c; color:#111827 }
 .badge.konfirmasi{ background:#ef4444; border-color:#ef4444; color:#fff }
+
+}
+
+
+/* Prominent header badge */
+header .wrap{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+
+#defBadge.glow{ animation:none; }
+
+  50%{ box-shadow: 0 0 0 8px rgba(0,0,0,.06); transform: translateY(-2px) scale(1.02); }
+  100%{ box-shadow: 0 10px 24px rgba(0,0,0,.12); transform: translateY(-2px) scale(1); }
+}
+/* Badge color variants already exist; ensure readable text */
+.badge.suspek{ color:#111827; }
+.badge.probable{ color:#111827; }
+.badge.konfirmasi{ color:#fff; }
+
+
+/* Sticky header */
+header{
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: #fff;
+  backdrop-filter: none;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+/* Header badge: proportional, no shadow */
+#defBadge{
+  display: inline-block;
+  margin-left: auto;
+  padding: 8px 14px;
+  border-radius: 9999px;
+  border: 1px solid #e5e7eb;
+  font-weight: 700;
+  letter-spacing: .2px;
+  box-shadow: none;
+  transform: none;
+}
+#defBadge.glow{ animation: none; } /* keep it calm as requested */

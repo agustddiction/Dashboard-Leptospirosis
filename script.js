@@ -303,15 +303,16 @@ function calculateDefinisi(gejala, paparan, lab) {
 
 function updateDefinisiBadge(){
   var badgeTop = document.getElementById('defBadge');
-  var badgeBottom = document.getElementById('defBadgeBottom');
+  var badgeBottom = null;
   function setBadge(txt){
     var klass = 'neutral';
     var t = (txt||'').toLowerCase();
     if(t === 'suspek') klass = 'suspek';
     else if(t === 'probable' || t === 'probabel') klass = 'probable';
     else if(t === 'konfirmasi' || t === 'terkonfirmasi') klass = 'konfirmasi';
-    if(badgeTop){ badgeTop.textContent = txt; badgeTop.className = 'badge '+klass; }
-    if(badgeBottom){ badgeBottom.textContent = txt; badgeBottom.className = 'badge '+klass; }
+    if(badgeTop){ badgeTop.textContent = txt; badgeTop.className = 'badge '+klass; try{ badgeTop.classList.remove('glow'); void badgeTop.offsetWidth; badgeTop.classList.add('glow'); }catch(_){}}
+    
+    
   }
 
   // Default
@@ -952,12 +953,12 @@ function initApp() {
   bindDefinisiRealtime(); try{ updateDefinisiBadge(); }catch(_){}
   setupActionButtons();
   _bindHeaderShadow();
-  document.getElementById('applyFilter').addEventListener('click', updateCharts);
-  document.getElementById('recalcMap')?.addEventListener('click', recalcCasesFromLocalAndRefresh);
-  document.getElementById('exportPng')?.addEventListener('click', exportPNG);
-  document.getElementById('pullSheets')?.addEventListener('click', ()=>pullFromSheets({merge:true, silent:false}));
-  document.getElementById('syncSheets')?.addEventListener('click', ()=>sendAllToSheets(false));
-  document.getElementById('fullSyncSheets')?.addEventListener('click', sendReplaceAllToSheets);
+  safeAddEvent('applyFilter','click', updateCharts);
+  safeAddEvent('recalcMap','click', recalcCasesFromLocalAndRefresh);
+  safeAddEvent('exportPng','click', exportPNG);
+  safeAddEvent('pullSheets','click', function(){ pullFromSheets({merge:true, silent:false}); });
+  safeAddEvent('syncSheets','click', function(){ sendAllToSheets(false); });
+  safeAddEvent('fullSyncSheets','click', sendReplaceAllToSheets);
   initMap();
   setTimeout(() => {
     try{
@@ -1158,5 +1159,27 @@ function getPaparanCheckedCount(){
   if(list.length === 0){
     list = Array.from(document.querySelectorAll('#paparan input[type="checkbox"], input[name^="paparan"]'));
   }
-  return list.filter(function(x){ return x && x.checked; }).length;
+  return (list||[]).filter(function(x){ return x && x.checked; }).length;
+}
+
+function initDefBannerObserver(){
+  try{
+    var banner = document.getElementById('defBanner');
+    var target = document.getElementById('simpan');
+    if(!banner || !target) return;
+    var observer = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting){ banner.classList.add('hidden'); }
+        else { banner.classList.remove('hidden'); }
+      });
+    }, {root: null, threshold: 0.2});
+    observer.observe(target);
+  }catch(_){}
+}
+
+function safeAddEvent(id, evt, fn){
+  var el = document.getElementById(id);
+  if(el && el.addEventListener){
+    try{ el.addEventListener(evt, fn); }catch(_){}
+  }
 }
