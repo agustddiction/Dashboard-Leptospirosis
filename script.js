@@ -300,8 +300,73 @@ function calculateDefinisi(gejala, paparan, lab) {
   return 'Tidak terdefinisi';
 }
 
-function updateDefinisiBadge() {
-  const gejala = {};
+
+function updateDefinisiBadge(){
+  var badgeTop = document.getElementById('defBadge');
+  var badgeBottom = document.getElementById('defBadgeBottom');
+  function setBadge(txt){
+    var klass = 'neutral';
+    var t = (txt||'').toLowerCase();
+    if(t === 'suspek') klass = 'suspek';
+    else if(t === 'probable' || t === 'probabel') klass = 'probable';
+    else if(t === 'konfirmasi' || t === 'terkonfirmasi') klass = 'konfirmasi';
+    if(badgeTop){ badgeTop.textContent = txt; badgeTop.className = 'badge '+klass; }
+    if(badgeBottom){ badgeBottom.textContent = txt; badgeBottom.className = 'badge '+klass; }
+  }
+
+  // Default
+  var definisi = 'Tidak memenuhi kriteria';
+
+  // === SUSPEK ===
+  var gejalaDemam = getCheck('demam') || /demam|fever/i.test(getValue('gejala_lain')||'');
+  var gejalaNyeriOtot = getCheck('mialgia') || getCheck('nyeriOtot');
+  var gejalaMalaise = getCheck('malaise') || /malaise|lemah/i.test(getValue('gejala_lain')||'');
+  var gejalaConj = getCheck('conj') || getCheck('conjungtival') || getCheck('conjunctival');
+
+  var paparan = getPaparanCheckedCount() > 0;
+  if(gejalaDemam && (gejalaNyeriOtot || gejalaMalaise || gejalaConj) && paparan){
+    definisi = 'Suspek';
+  }
+
+  // === PROBABLE ===
+  var klinisCount = 0;
+  if(getCheck('nyeriBetis')) klinisCount++;
+  if(getCheck('jaundice') || /ikterus|jaundice/i.test(getValue('gejala_lain')||'')) klinisCount++;
+  if(getCheck('anuria') || getCheck('oliguria')) klinisCount++;
+  if(getCheck('perdarahan')) klinisCount++;
+  if(getCheck('sesak')) klinisCount++;
+  if(getCheck('aritmia')) klinisCount++;
+  if(getCheck('batuk')) klinisCount++;
+  if(getCheck('ruam')) klinisCount++;
+
+  var rdtPositif = /positif/i.test(getValue('rdt')||'');
+
+  var labFlags = 0;
+  if(getNum('trombosit') && getNum('trombosit') < 100000) labFlags++;
+  // Neutrofil > 80%: coba baca dari 'neutrofil' (%), kalau tak ada pakai leukosit tinggi sebagai indikator klinis tambahan
+  if(getNum('neutrofil') > 80 || getNum('leukosit') > 11000) labFlags++;
+  if(getNum('bilirubin') > 2 || getNum('amilase') > 100 || getNum('cpk') > 200) labFlags++;
+  if(getCheck('proteinuria') || getCheck('hematuria')) labFlags++;
+
+  var probableByKlinis = (definisi === 'Suspek') && (klinisCount >= 2);
+  var probableByRDT = (definisi === 'Suspek') && rdtPositif;
+  var probableByLab = (definisi === 'Suspek') && (labFlags >= 3);
+  if(probableByKlinis || probableByRDT || probableByLab){
+    definisi = 'Probable';
+  }
+
+  // === KONFIRMASI ===
+  var pcrPos = /positif/i.test(getValue('pcr')||'');
+  var kulturPos = /positif/i.test(getValue('kultur')||'');
+  var matPos = /positif|4x/i.test(getValue('mat')||'');
+  if(pcrPos || kulturPos || matPos){
+    definisi = 'Konfirmasi';
+  }
+
+  setBadge(definisi);
+}
+
+;
   GEJALA.forEach(g => {
     const cb = document.getElementById(g.id);
     gejala[g.label] = cb ? cb.checked : false;
@@ -884,7 +949,7 @@ function initApp() {
   _syncTimeModeUI();
   fTimeMode?.addEventListener('change', _syncTimeModeUI);
   bindRapidRadioUpdates();
-  bindDefinisiRealtime();
+  bindDefinisiRealtime(); try{ updateDefinisiBadge(); }catch(_){}
   setupActionButtons();
   _bindHeaderShadow();
   document.getElementById('applyFilter').addEventListener('click', updateCharts);
@@ -914,27 +979,28 @@ function initApp() {
   const OK_KEY = 'lepto_token_ok';
   let unlocked = false;
   
-  function hasOk(){ 
-    try{ 
-      return localStorage.getItem(OK_KEY) === '1'; 
-    } catch(_) { 
-      return false; 
-    } 
+  function hasOk(){
+    try {
+      if (localStorage.getItem(OK_KEY) === '1') return true;
+    } catch(_) {}
+    try {
+      if (sessionStorage.getItem(OK_KEY) === '1') return true;
+    } catch(_) {}
+    if (window.__LEPTO_OK === 1) return true;
+    return false;
   }
   
   function setOk(){
-    try{ 
-      localStorage.setItem(OK_KEY, '1'); 
-      return true;
-    } catch(_) { 
-      return false; 
-    }
+    try { localStorage.setItem(OK_KEY, '1'); return true; } catch(_) {}
+    try { sessionStorage.setItem(OK_KEY, '1'); return true; } catch(_) {}
+    try { window.__LEPTO_OK = 1; return true; } catch(_) {}
+    return false;
   }
   
   function hideLock(){
     const el = document.getElementById('lock');
-    if(el){ 
-      el.style.display = 'none';
+    document.body.classList.remove('locked');
+    if(el){ el.style.display = 'none';
       document.body.classList.remove('locked'); 
     }
   }
@@ -962,7 +1028,7 @@ function initApp() {
   function verifyToken(){
     const input = document.getElementById('tokenInput');
     const err = document.getElementById('lockErr');
-    const val = (input?.value || '').trim();
+    const val = (input && typeof input.value==='string' ? input.value : '').trim();
     
     if(err) err.style.display = 'none';
     
@@ -1056,4 +1122,41 @@ function bindLabFastRecalc(){
         el.addEventListener('change', function(){ try{ if(typeof updateDefinisiBadge==='function') updateDefinisiBadge(); }catch(_){}});
       }
     });
+}
+
+
+function getEl(id){ return document.getElementById(id); }
+
+
+function getValue(id){
+  var el = document.getElementById(id);
+  if(!el) return '';
+  if(el.type === 'checkbox') return el.checked ? 'Ya' : 'Tidak';
+  return (el.value||'').trim();
+}
+
+
+function getNum(id){
+  var v = parseFloat((getValue(id)+'').replace(/[^0-9\.\-]/g,''));
+  return isNaN(v) ? 0 : v;
+}
+
+
+function getCheck(id){
+  var el = document.getElementById(id);
+  if(!el) return false;
+  if(el.type === 'checkbox') return !!el.checked;
+  var v = (el.value||'').toLowerCase();
+  return v === 'ya' || v === 'positif' || v === 'true' || v === '1' || v === 'on';
+}
+
+
+function getPaparanCheckedCount(){
+  // Hitung semua checkbox paparan. Asumsikan memakai class 'paparan' pada input terkait;
+  // jika tidak ada, fallback: cari checkbox dalam section dengan id 'paparan' atau name berawalan 'paparan'.
+  var list = Array.from(document.querySelectorAll('input.paparan[type="checkbox"]'));
+  if(list.length === 0){
+    list = Array.from(document.querySelectorAll('#paparan input[type="checkbox"], input[name^="paparan"]'));
+  }
+  return list.filter(function(x){ return x && x.checked; }).length;
 }

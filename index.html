@@ -104,15 +104,15 @@
       <div class="grid-3">
         <div>
           <label>Leukosit (x10³/µL) <span class="muted">(N: 3.5–10.5)</span></label>
-          <input id="leukosit" type="number" step="0.1" placeholder="cth: 7.2"/>
+          <input id="leukosit" type="number" step="0.1" placeholder="cth: 7.2"/ placeholder="4–11 ribu /mm³" title="Normal 4.000–11.000 /mm³">
         </div>
         <div>
           <label>Trombosit (x10³/µL) <span class="muted">(N: 150–450)</span></label>
-          <input id="trombosit" type="number" step="1" placeholder="cth: 180"/>
+          <input id="trombosit" type="number" step="1" placeholder="cth: 180"/ placeholder="150–450 ribu /mm³" title="Normal 150.000–450.000 /mm³">
         </div>
         <div>
           <label>Bilirubin total (mg/dL) <span class="muted">(N: 0.1–1.2)</span></label>
-          <input id="bilirubin" type="number" step="0.1" placeholder="cth: 1.8"/>
+          <input id="bilirubin" type="number" step="0.1" placeholder="cth: 1.8"/ placeholder="≤ 2 mg/dL" title="Normal ≤ 2 mg/dL">
         </div>
         <div>
           <label>SGOT/AST (U/L) <span class="muted">(N: ≤40)</span></label>
@@ -156,11 +156,11 @@
         <div class="grid-3" style="margin-top:10px">
           <div>
             <label>Amilase (U/L) <span class="muted">(N: 30–110)</span></label>
-            <input id="amilase" type="number" step="1" placeholder="cth: 95"/>
+            <input id="amilase" type="number" step="1" placeholder="cth: 95"/ placeholder="≤ 100 U/L" title="Normal ≤ 100 U/L">
           </div>
           <div>
             <label>CPK (U/L) <span class="muted">(N: 30–200)</span></label>
-            <input id="cpk" type="number" step="1" placeholder="cth: 190"/>
+            <input id="cpk" type="number" step="1" placeholder="cth: 190"/ placeholder="≤ 200 U/L" title="Normal ≤ 200 U/L">
           </div>
           <div>
             <label>PCR</label>
@@ -1510,5 +1510,12 @@ function initApp() {
 })();
 </script>
 <script src="./script.js"></script>
+
+<!-- Definisi Kasus - Status Bawah -->
+<div id="defStatusBottom" class="def-status-fixed" aria-live="polite">
+  <span class="label">Definisi Kasus:</span>
+  <span id="defBadgeBottom" class="badge neutral">Tidak memenuhi kriteria</span>
+</div>
+
 </body>
 </html>

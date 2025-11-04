@@ -146,3 +146,26 @@ header{ transform: translateY(0); }
 .badge{ transition: all 0.3s ease; }
 .badge.pulse{animation:pulse .5s ease-in-out}
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05);box-shadow:0 0 8px rgba(0,0,0,.2)}}
+
+.def-status-fixed{
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255,255,255,.92);
+  backdrop-filter: blur(6px);
+  border: 1px solid #e5e7eb;
+  border-radius: 9999px;
+  padding: 8px 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12);
+  z-index: 1000;
+}
+.def-status-fixed .label{ font-size: 12px; color: #4b5563; }
+@media (max-width: 560px){
+  .def-status-fixed{ left: 12px; right: 12px; justify-content: space-between; }
+}
+.badge.suspek{ background:#f59e0b; border-color:#f59e0b; color:#111827 }
+.badge.probable{ background:#fb923c; border-color:#fb923c; color:#111827 }
+.badge.konfirmasi{ background:#ef4444; border-color:#ef4444; color:#fff }
