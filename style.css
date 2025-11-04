@@ -136,3 +136,13 @@ header .container, header .wrap{ position: relative; }
 
 
 header{ transform: translateY(0); }
+
+.badge.neutral{ background:#9ca3af; border-color:#9ca3af; color:#fff }
+
+.tag.neutral{ border-color:#9ca3af; color:#9ca3af }
+
+.choice{ display:inline-flex; align-items:center; gap:4px; margin-right:12px }
+
+.badge{ transition: all 0.3s ease; }
+.badge.pulse{animation:pulse .5s ease-in-out}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05);box-shadow:0 0 8px rgba(0,0,0,.2)}}
