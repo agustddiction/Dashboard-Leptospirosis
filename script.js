@@ -2,7 +2,7 @@
 // KONFIGURASI
 // =====================
 const ACCESS_TOKEN = 'ZOOLEPTO123';
-const DEFAULT_GH = 'https://raw.githubusercontent.com/agustddiction/Dashboard-Leptospirosis/main/provinsi.json';
+const DEFAULT_GH = 'https://raw.githubusercontent.com/timkerptvz/Dashboard-Leptospirosis/main/provinsi.json';
 const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbyR8WE2fj68tqerlOGySgVOagIrErB886veKazNpetlXWTO-Bi85G3_IccJDNnph4km/exec';
 const SPREADSHEET_ID = '1rcySn3UNzsEHCd7t7ld4f-pSBUTrbNDBDgvxjbLcRm4';
 const SHEET_NAME = 'Kasus';
