@@ -215,13 +215,15 @@ function renderTable() {
 }
 
 function getFormData() {
-  
-  // normalize common date fields (added)
-  try{
-    var onsetEl = document.getElementById('onsetManual'); if(onsetEl) onsetEl.value = toISODate(onsetEl.value);
-    var tglStatusEl = document.getElementById('tglStatus'); if(tglStatusEl) tglStatusEl.value = toISODate(tglStatusEl.value);
-  }catch(_){}
-const gejala = {};
+  // Normalisasi tanggal umum (onset manual & tanggal status) ke format ISO YYYY-MM-DD
+  try {
+    const onsetEl = document.getElementById('onsetManual');
+    if (onsetEl) onsetEl.value = toISODate(onsetEl.value);
+    const tglStatusEl = document.getElementById('tglStatus');
+    if (tglStatusEl) tglStatusEl.value = toISODate(tglStatusEl.value);
+  } catch (_) {}
+
+  const gejala = {};
   const gejalaTgl = {};
   GEJALA.forEach(g => {
     const cb = document.getElementById(g.id);
@@ -240,7 +242,25 @@ const gejala = {};
     return sel ? sel.value : 'nd';
   };
 
+  // Tanggal onset pertama (paling awal dari gejala / onset manual)
   const onset = calculateOnset(gejalaTgl);
+
+  const lab = {
+    leukosit: document.getElementById('leukosit').value,
+    trombosit: document.getElementById('trombosit').value,
+    bilirubin: document.getElementById('bilirubin').value,
+    sgot: document.getElementById('sgot').value,
+    sgpt: document.getElementById('sgpt').value,
+    kreatinin: document.getElementById('kreatinin').value,
+    rdt: getRdVal('rdt'),
+    mat: getRdVal('mat'),
+    serovar: document.getElementById('serovar').value.trim(),
+    amilase: document.getElementById('amilase').value,
+    cpk: document.getElementById('cpk').value,
+    pcr: getRdVal('pcr'),
+    proteinuria: document.getElementById('proteinuria').checked,
+    hematuria: document.getElementById('hematuria').checked,
+  };
 
   const data = {
     uuid: editingUUID || genUUID(),
@@ -251,32 +271,18 @@ const gejala = {};
     prov: document.getElementById('prov').value,
     kab: document.getElementById('kab').value,
     alamat: document.getElementById('alamat').value.trim(),
-    onset,
+    onset,          // tanggal kasus = tanggal onset pertama
     gejala,
     gejalaTgl,
     paparan,
-    lab: {
-      leukosit: document.getElementById('leukosit').value,
-      trombosit: document.getElementById('trombosit').value,
-      bilirubin: document.getElementById('bilirubin').value,
-      sgot: document.getElementById('sgot').value,
-      sgpt: document.getElementById('sgpt').value,
-      kreatinin: document.getElementById('kreatinin').value,
-      rdt: getRdVal('rdt'),
-      mat: getRdVal('mat'),
-      serovar: document.getElementById('serovar').value.trim(),
-      amilase: document.getElementById('amilase').value,
-      cpk: document.getElementById('cpk').value,
-      pcr: getRdVal('pcr'),
-      proteinuria: document.getElementById('proteinuria').checked,
-      hematuria: document.getElementById('hematuria').checked,
-    },
-    definisi: calculateDefinisi(gejala, paparan, { leukosit: document.getElementById('leukosit').value, trombosit: document.getElementById('trombosit').value, bilirubin: document.getElementById('bilirubin').value, rdt: getRdVal('rdt'), mat: getRdVal('mat') }),
+    lab,
+    definisi: calculateDefinisi(gejala, paparan, lab),
     statusAkhir: document.getElementById('statusAkhir').value,
     tglStatus: document.getElementById('tglStatus').value,
     obat: document.getElementById('obat').value.trim(),
     savedAt: new Date().toISOString()
   };
+
   return data;
 }
 
@@ -292,11 +298,42 @@ function calculateOnset(gejalaTgl) {
 function calculateDefinisi(gejala, paparan, lab) {
   const hasSymptoms = Object.values(gejala).some(v => v);
   const hasExposure = paparan.some(p => p.checked);
+
   const rdtPos = lab.rdt === 'pos';
   const matPos = lab.mat === 'pos';
-  if (matPos) return 'Konfirmasi';
-  if (rdtPos && hasSymptoms && hasExposure) return 'Probable';
+  const pcrPos = lab.pcr === 'pos';
+
+  // 1) Konfirmasi: MAT positif atau PCR positif
+  if (matPos || pcrPos) return 'Konfirmasi';
+
+  // 2) RDT positif -> Probable (tanpa menunggu lab lain)
+  if (rdtPos) return 'Probable';
+
+  // 3) Komposit lab (>=3 abnormal) -> Probable
+  let abnormal = 0;
+
+  const leuk = parseFloat(lab.leukosit || 0);
+  const trom = parseFloat(lab.trombosit || 0);
+  const bili = parseFloat(lab.bilirubin || 0);
+  const amil = parseFloat(lab.amilase || 0);
+  const cpk  = parseFloat(lab.cpk || 0);
+  const prot = !!lab.proteinuria;
+  const hem  = !!lab.hematuria;
+
+  if (trom > 0 && trom < 100) abnormal++;
+  if (leuk > 0 && (leuk < 3.5 || leuk > 10.5)) abnormal++;
+  if (bili > 2) abnormal++;
+  if (amil > 110) abnormal++;
+  if (cpk > 200) abnormal++;
+  if (prot) abnormal++;
+  if (hem) abnormal++;
+
+  if (abnormal >= 3) return 'Probable';
+
+  // 4) Suspek: ada gejala + ada paparan
   if (hasSymptoms && hasExposure) return 'Suspek';
+
+  // 5) Lainnya
   return 'Tidak terdefinisi';
 }
 
@@ -317,7 +354,20 @@ function updateDefinisiBadge() {
     return sel ? sel.value : 'nd';
   };
 
-  const def = calculateDefinisi(gejala, paparan, { leukosit: document.getElementById('leukosit').value, trombosit: document.getElementById('trombosit').value, bilirubin: document.getElementById('bilirubin').value, rdt: getRdVal('rdt'), mat: getRdVal('mat') });
+  const lab = {
+    leukosit: document.getElementById('leukosit').value,
+    trombosit: document.getElementById('trombosit').value,
+    bilirubin: document.getElementById('bilirubin').value,
+    amilase: document.getElementById('amilase').value,
+    cpk: document.getElementById('cpk').value,
+    proteinuria: document.getElementById('proteinuria').checked,
+    hematuria: document.getElementById('hematuria').checked,
+    rdt: getRdVal('rdt'),
+    mat: getRdVal('mat'),
+    pcr: getRdVal('pcr'),
+  };
+
+  const def = calculateDefinisi(gejala, paparan, lab);
 
   const badge = document.getElementById('defBadge');
   if (badge) {
@@ -328,6 +378,7 @@ function updateDefinisiBadge() {
     else if (def === 'Suspek') badge.classList.add('neutral');
     else badge.classList.add('bad');
   }
+}
 }
 
 function buildGejalaGrid() {
@@ -584,7 +635,12 @@ function ensureCharts(){
   if(!jkChart){ jkChart=new Chart('jkChart',{type:'doughnut',data:{labels:['Laki-laki', 'Perempuan', 'Tidak diisi'],datasets:[{label:'Kasus',data:[],backgroundColor:['#0284c7', '#db2777', '#e5e7eb']}]},options:pieOptions}); }
 }
 
-function getDateForAgg(d){ return d.onset || d.tglStatus || (d.savedAt ? d.savedAt.slice(0,10) : ''); }
+function getDateForAgg(d){
+  if (d.onset && d.onset.length >= 10) return d.onset.slice(0,10);
+  if (d.tglStatus && d.tglStatus.length >= 10) return d.tglStatus.slice(0,10);
+  if (d.savedAt && d.savedAt.length >= 10) return d.savedAt.slice(0,10);
+  return '';
+}
 function monthKey(dateStr){ return dateStr ? dateStr.slice(0,7) : ''; }
 function yearKey(dateStr){ return dateStr ? dateStr.slice(0,4) : ''; }
 function withinRangeMonth(dateStr,start,end){ const m=monthKey(dateStr); if(!m) return false; if(start&&m<start) return false; if(end&&m>end) return false; return true; }
@@ -758,7 +814,13 @@ function flatToCase(r){
     definisi: r['Definisi']||'',
     statusAkhir: r['Status Akhir']||'',
     tglStatus: r['Tanggal Status']||'',
-    savedAt: r['Saved At']||new Date().toISOString()
+    savedAt: (function(){
+      let v = r['Saved At'] || '';
+      if (!v && r['Tanggal Input Data']) {
+        try { v = new Date(r['Tanggal Input Data']).toISOString(); } catch(_) {}
+      }
+      return v || new Date().toISOString();
+    })()
   };
 }
 function getKey(d){ return (d && d.uuid) ? ('uuid:'+d.uuid) : ('dup:'+([ (d.nama||'').trim().toLowerCase(), (d.umur||'')+'', (d.alamat||'').trim().toLowerCase(), d.onset||'' ].join('|'))); }
@@ -881,29 +943,49 @@ function initApp() {
   buildGejalaGrid();
   buildPaparanGrid();
   renderAll();
+
+  // Mode waktu filter (bulan/tahun)
   _syncTimeModeUI();
   fTimeMode?.addEventListener('change', _syncTimeModeUI);
+
   bindRapidRadioUpdates();
   bindDefinisiRealtime();
   setupActionButtons();
   _bindHeaderShadow();
-  document.getElementById('applyFilter').addEventListener('click', updateCharts);
+
+  const applyBtn = document.getElementById('applyFilter');
+  if (applyBtn) applyBtn.addEventListener('click', updateCharts);
+
   document.getElementById('recalcMap')?.addEventListener('click', recalcCasesFromLocalAndRefresh);
   document.getElementById('exportPng')?.addEventListener('click', exportPNG);
-  document.getElementById('pullSheets')?.addEventListener('click', ()=>pullFromSheets({merge:true, silent:false}));
-  document.getElementById('syncSheets')?.addEventListener('click', ()=>sendAllToSheets(false));
+  document.getElementById('pullSheets')?.addEventListener('click', () => pullFromSheets({ merge:true, silent:false }));
+  document.getElementById('syncSheets')?.addEventListener('click', () => sendAllToSheets(false));
   document.getElementById('fullSyncSheets')?.addEventListener('click', sendReplaceAllToSheets);
+
+  // Judul tren menjelaskan bahwa memakai tanggal onset pertama
+  const trendTitleEl = document.getElementById('trendTitle');
+  if (trendTitleEl) {
+    trendTitleEl.textContent = 'Tren kasus per bulan (berdasarkan tanggal onset pertama)';
+  }
+
   initMap();
   setTimeout(() => {
-    try{
-      if(window._leaf_map) {
+    try {
+      if (window._leaf_map) {
         window._leaf_map.invalidateSize();
         fitIndonesia();
       }
-    } catch(e) {
+    } catch (e) {
       console.warn("Map resize failed:", e);
     }
   }, 500);
+
+  // Auto sync dari Google Sheets saat dashboard dibuka (jika online)
+  if (AUTO_SYNC_ENABLED && syncStatus.isOnline) {
+    pullFromSheets({ merge: true, silent: true });
+  }
+
+  // Jadwalkan auto-pull berkala
   scheduleAutoPull();
 }
 
