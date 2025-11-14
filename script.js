@@ -125,6 +125,14 @@ function initProvKab(){
 
 function genUUID(){
   try{ if (crypto && crypto.randomUUID) return crypto.randomUUID(); }
+  catch(_) {}
+  return 'xxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c){
+    const r = Math.random()*16|0;
+    const v = c === 'x' ? r : (r&0x3|0x8);
+    return v.toString(16);
+  });
+}
+
 function normalizeDateString(str) {
   if (!str) return '';
   if (typeof str !== 'string') {
@@ -147,14 +155,13 @@ function normalizeDateString(str) {
     let d = parseInt(m1[1], 10);
     let m = parseInt(m1[2], 10);
     let y = parseInt(m1[3], 10);
-    if (y < 100) y = 2000 + y; // asumsi abad 2000-an
+    if (y < 100) y = 2000 + y;
     if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
       const dt = new Date(y, m - 1, d);
       if (!isNaN(dt.getTime())) return dt.toISOString().slice(0, 10);
     }
   }
 
-  // Jika tidak dikenali, coba parse native Date
   try {
     const d = new Date(s);
     if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
@@ -178,14 +185,6 @@ function normalizeCaseDates(d) {
     if (n) d.savedAt = n + 'T00:00:00.000Z';
   }
   return d;
-}
-
-  catch(_) {}
-  return 'xxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c){
-    const r = Math.random()*16|0;
-    const v = c === 'x' ? r : (r&0x3|0x8);
-    return v.toString(16);
-  });
 }
 
 function normalizeString(str) {
@@ -216,7 +215,6 @@ function loadCases() {
     console.error('Error loading cases:', e);
     return [];
   }
-}
 }
 
 function saveCases(arr) {
@@ -274,8 +272,16 @@ function renderTable() {
   });
 }
 
+function toISODate(val) {
+  if (!val) return '';
+  try {
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  } catch (_) {}
+  return val;
+}
+
 function getFormData() {
-  // Normalisasi tanggal umum (onset manual & tanggal status) ke format ISO YYYY-MM-DD
   try {
     const onsetEl = document.getElementById('onsetManual');
     if (onsetEl) onsetEl.value = toISODate(onsetEl.value);
@@ -302,7 +308,6 @@ function getFormData() {
     return sel ? sel.value : 'nd';
   };
 
-  // Tanggal onset pertama (paling awal dari gejala / onset manual)
   const onset = calculateOnset(gejalaTgl);
 
   const lab = {
@@ -331,7 +336,7 @@ function getFormData() {
     prov: document.getElementById('prov').value,
     kab: document.getElementById('kab').value,
     alamat: document.getElementById('alamat').value.trim(),
-    onset,          // tanggal kasus = tanggal onset pertama
+    onset,
     gejala,
     gejalaTgl,
     paparan,
@@ -363,15 +368,10 @@ function calculateDefinisi(gejala, paparan, lab) {
   const matPos = lab.mat === 'pos';
   const pcrPos = lab.pcr === 'pos';
 
-  // 1) Konfirmasi: MAT positif atau PCR positif
   if (matPos || pcrPos) return 'Konfirmasi';
-
-  // 2) RDT positif -> Probable (tanpa menunggu lab lain)
   if (rdtPos) return 'Probable';
 
-  // 3) Komposit lab (>=3 abnormal) -> Probable
   let abnormal = 0;
-
   const leuk = parseFloat(lab.leukosit || 0);
   const trom = parseFloat(lab.trombosit || 0);
   const bili = parseFloat(lab.bilirubin || 0);
@@ -389,11 +389,7 @@ function calculateDefinisi(gejala, paparan, lab) {
   if (hem) abnormal++;
 
   if (abnormal >= 3) return 'Probable';
-
-  // 4) Suspek: ada gejala + ada paparan
   if (hasSymptoms && hasExposure) return 'Suspek';
-
-  // 5) Lainnya
   return 'Tidak terdefinisi';
 }
 
@@ -438,7 +434,6 @@ function updateDefinisiBadge() {
     else if (def === 'Suspek') badge.classList.add('neutral');
     else badge.classList.add('bad');
   }
-}
 }
 
 function buildGejalaGrid() {
@@ -517,12 +512,10 @@ function updateOnsetTag() {
   });
   const onset = calculateOnset(gejalaTgl);
   const tag = document.getElementById('onsetTag');
-  if (tag) tag.textContent = onset || '–';
+  if (tag) tag.textContent = onset || '—';
 }
 
 function resetForm() {
-  try{ setInputTanggalData(''); }catch(_){}
-
   document.getElementById('nama').value = '';
   document.getElementById('jk').value = '';
   document.getElementById('umur').value = '';
@@ -796,10 +789,10 @@ async function loadFromUrl(url){
     if(!res.ok) throw new Error('status '+res.status);
     return await res.json();
   }catch(err){
-  const msg = (err && err.message) ? String(err.message).slice(0,200) : (err ? String(err).slice(0,200) : "Unknown error");
-  try{ updateSyncStatus("Gagal kirim ke Sheets: " + msg, true); }catch(_){}
-  try{ alert("Gagal kirim ke Sheets: " + msg); }catch(_){}
-}
+    const msg = (err && err.message) ? String(err.message).slice(0,200) : (err ? String(err).slice(0,200) : "Unknown error");
+    console.error('Failed to load:', msg);
+    throw err;
+  }
 }
 function renderChoropleth(geojson){
   ensureMap();
@@ -823,10 +816,40 @@ function exportPNG(){
 function recalcCasesByProvinceFromLocal(){ const arr=loadCases(); const counts={}; arr.forEach(d=>{ const p=d.prov||'(Tidak diisi)'; counts[p]=(counts[p]||0)+1; }); return counts; }
 function recalcCasesFromLocalAndRefresh(){ const counts=recalcCasesByProvinceFromLocal(); if(Object.keys(counts).length){ casesByProvince=counts; refreshChoropleth(); } }
 
+function toLocalDateTime(isoStr) {
+  if (!isoStr) return '';
+  try {
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleString('id-ID', { 
+      year: 'numeric', 
+      month: '2-digit', 
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch (_) {
+    return '';
+  }
+}
+
 function flattenCase(d){
   const row={
     'Saved At': (d && d.savedAt ? d.savedAt : ''),
-    'Tanggal Input Data': (d && d.savedAt ? toLocalDateTime(d.savedAt) : ''), 'UUID':d.uuid||'', 'Nama':d.nama,'Jenis Kelamin':d.jk,'Umur':d.umur,'Pekerjaan':d.kerja,'Provinsi':d.prov,'Kab/Kota':d.kab,'Alamat':d.alamat,'Onset':d.onset,'Definisi':d.definisi,'Status Akhir':d.statusAkhir,'Tanggal Status':d.tglStatus,'Saved At':d.savedAt };
+    'Tanggal Input Data': (d && d.savedAt ? toLocalDateTime(d.savedAt) : ''),
+    'UUID':d.uuid||'',
+    'Nama':d.nama,
+    'Jenis Kelamin':d.jk,
+    'Umur':d.umur,
+    'Pekerjaan':d.kerja,
+    'Provinsi':d.prov,
+    'Kab/Kota':d.kab,
+    'Alamat':d.alamat,
+    'Onset':d.onset,
+    'Definisi':d.definisi,
+    'Status Akhir':d.statusAkhir,
+    'Tanggal Status':d.tglStatus
+  };
   GEJALA.forEach(g=>{ const label=g.label; row['Gejala: '+label]=d.gejala[label]?'Ya':''; row['Tgl '+label]=d.gejalaTgl[label]||''; });
   row['Paparan (2 minggu)']=(d.paparan||[]).filter(x=>x.checked).map(x=>x.label).join('; ');
   const Lb=d.lab||{};
@@ -851,6 +874,7 @@ function parseGVizJSON(text){
   const rows=(table.rows||[]).map(r=>(r.c||[]).map(c=>c?(c.v??''):''));
   return rows.map(vals=>{ const o={}; headers.forEach((h,i)=>o[h]=vals[i]); return o; });
 }
+
 function flatToCase(r){
   const c = {
     uuid: r['UUID']||'',
@@ -884,7 +908,29 @@ function flatToCase(r){
   };
   return normalizeCaseDates(c);
 }
-calArr.forEach(d=>{ byKey.set(getKey(d), d); });
+
+function toDate(str) {
+  if (!str) return new Date(0);
+  try {
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? new Date(0) : d;
+  } catch (_) {
+    return new Date(0);
+  }
+}
+
+function getKey(d) {
+  return [
+    normalizeString(d.nama || ''),
+    (d.umur || '').toString().trim(),
+    normalizeString(d.alamat || ''),
+    (d.onset || '')
+  ].join('|');
+}
+
+function mergeCases(localArr, remoteArr) {
+  const byKey = new Map();
+  localArr.forEach(d=>{ byKey.set(getKey(d), d); });
   remoteArr.forEach(r=>{
     const k = getKey(r);
     if(!byKey.has(k)){ byKey.set(k, r); }
@@ -897,6 +943,7 @@ calArr.forEach(d=>{ byKey.set(getKey(d), d); });
   });
   return Array.from(byKey.values());
 }
+
 async function readSheetCases(){
   if(!SPREADSHEET_ID || SPREADSHEET_ID.startsWith('GANTI_')) throw new Error('SPREADSHEET_ID belum diisi');
   const res = await fetch(SHEETS_READ_URL, { mode:'cors', cache:'no-store' });
@@ -904,6 +951,7 @@ async function readSheetCases(){
   const flat = parseGVizJSON(text);
   return flat.map(flatToCase);
 }
+
 async function pullFromSheets(opts={merge:true, silent:false}){
   if(!SPREADSHEET_ID || SPREADSHEET_ID.startsWith('GANTI_')){ if(!opts.silent) alert('SPREADSHEET_ID belum diisi di script.js'); return; }
   try{
@@ -921,6 +969,7 @@ async function pullFromSheets(opts={merge:true, silent:false}){
     if(!opts.silent) alert('Gagal sync dari Sheets: '+err.message);
   }
 }
+
 async function sendAllToSheets(replace=false){
   if(!SHEETS_URL || SHEETS_URL.startsWith('GANTI_')){ alert('SHEETS_URL belum diisi di script.js'); return; }
   const arr=loadCases(); if(arr.length===0){ alert('Tidak ada data untuk dikirim.'); return; }
@@ -1001,7 +1050,6 @@ function initApp() {
   buildPaparanGrid();
   renderAll();
 
-  // Mode waktu filter (bulan/tahun)
   _syncTimeModeUI();
   fTimeMode?.addEventListener('change', _syncTimeModeUI);
 
@@ -1019,7 +1067,6 @@ function initApp() {
   document.getElementById('syncSheets')?.addEventListener('click', () => sendAllToSheets(false));
   document.getElementById('fullSyncSheets')?.addEventListener('click', sendReplaceAllToSheets);
 
-  // Judul tren menjelaskan bahwa memakai tanggal onset pertama
   const trendTitleEl = document.getElementById('trendTitle');
   if (trendTitleEl) {
     trendTitleEl.textContent = 'Tren kasus per bulan (berdasarkan tanggal onset pertama)';
@@ -1037,12 +1084,10 @@ function initApp() {
     }
   }, 500);
 
-  // Auto sync dari Google Sheets saat dashboard dibuka (jika online)
   if (AUTO_SYNC_ENABLED && syncStatus.isOnline) {
     pullFromSheets({ merge: true, silent: true });
   }
 
-  // Jadwalkan auto-pull berkala
   scheduleAutoPull();
 }
 
@@ -1184,32 +1229,4 @@ function initApp() {
   
   window.__leptoToken = { verifyToken, showLock, afterUnlock };
 })();
-
-/** Fast recalc for Definisi Kasus when lab values change (added) */
-function bindLabFastRecalc(){
-  // Tambahan opsional: recalculation cepat definisi kasus saat nilai lab berubah.
-  const labIds = ['leukosit','trombosit','bilirubin','sgot','sgpt','kreatinin','amilase','cpk'];
-  labIds.forEach(function(id){
-    const el = document.getElementById(id);
-    if(el){
-      el.addEventListener('input', function(){ 
-        try { if (typeof updateDefinisiBadge === 'function') updateDefinisiBadge(); } catch(_) {}
-      });
-      el.addEventListener('change', function(){ 
-        try { if (typeof updateDefinisiBadge === 'function') updateDefinisiBadge(); } catch(_) {}
-      });
-    }
-  });
-
-  const radioNames = ['rdt','mat','pcr'];
-  radioNames.forEach(function(name){
-    const rds = document.querySelectorAll('input[name="'+name+'"]');
-    rds.forEach(function(rd){
-      rd.addEventListener('change', function(){
-        try { if (typeof updateDefinisiBadge === 'function') updateDefinisiBadge(); } catch(_) {}
-      });
-    });
-  });
-}
-    });
-}
+      
