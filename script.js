@@ -125,6 +125,61 @@ function initProvKab(){
 
 function genUUID(){
   try{ if (crypto && crypto.randomUUID) return crypto.randomUUID(); }
+function normalizeDateString(str) {
+  if (!str) return '';
+  if (typeof str !== 'string') {
+    try {
+      const d = new Date(str);
+      if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+    } catch (_) {}
+    return '';
+  }
+  const s = str.trim();
+  if (!s) return '';
+
+  // Sudah ISO (YYYY-MM-DD)
+  const isoMatch = /^\d{4}-\d{2}-\d{2}/.exec(s);
+  if (isoMatch) return isoMatch[0];
+
+  // Format umum: DD/MM/YYYY atau DD-MM-YYYY
+  const m1 = /^([0-3]?\d)[\/-]([0-1]?\d)[\/-](\d{2,4})$/.exec(s);
+  if (m1) {
+    let d = parseInt(m1[1], 10);
+    let m = parseInt(m1[2], 10);
+    let y = parseInt(m1[3], 10);
+    if (y < 100) y = 2000 + y; // asumsi abad 2000-an
+    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      const dt = new Date(y, m - 1, d);
+      if (!isNaN(dt.getTime())) return dt.toISOString().slice(0, 10);
+    }
+  }
+
+  // Jika tidak dikenali, coba parse native Date
+  try {
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  } catch (_) {}
+
+  return '';
+}
+
+function normalizeCaseDates(d) {
+  if (!d) return d;
+  if (d.onset) {
+    const n = normalizeDateString(d.onset);
+    if (n) d.onset = n;
+  }
+  if (d.tglStatus) {
+    const n = normalizeDateString(d.tglStatus);
+    if (n) d.tglStatus = n;
+  }
+  if (d.savedAt) {
+    const n = normalizeDateString(d.savedAt);
+    if (n) d.savedAt = n + 'T00:00:00.000Z';
+  }
+  return d;
+}
+
   catch(_) {}
   return 'xxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c){
     const r = Math.random()*16|0;
@@ -152,11 +207,16 @@ let editingUUID = null;
 function loadCases() {
   try {
     const data = localStorage.getItem('lepto_cases');
-    return data ? JSON.parse(data) : [];
+    const parsed = data ? JSON.parse(data) : [];
+    if (Array.isArray(parsed)) {
+      return parsed.map(normalizeCaseDates);
+    }
+    return [];
   } catch (e) {
     console.error('Error loading cases:', e);
     return [];
   }
+}
 }
 
 function saveCases(arr) {
@@ -792,7 +852,7 @@ function parseGVizJSON(text){
   return rows.map(vals=>{ const o={}; headers.forEach((h,i)=>o[h]=vals[i]); return o; });
 }
 function flatToCase(r){
-  return {
+  const c = {
     uuid: r['UUID']||'',
     nama: r['Nama']||'',
     jk: r['Jenis Kelamin']||'',
@@ -822,12 +882,9 @@ function flatToCase(r){
       return v || new Date().toISOString();
     })()
   };
+  return normalizeCaseDates(c);
 }
-function getKey(d){ return (d && d.uuid) ? ('uuid:'+d.uuid) : ('dup:'+([ (d.nama||'').trim().toLowerCase(), (d.umur||'')+'', (d.alamat||'').trim().toLowerCase(), d.onset||'' ].join('|'))); }
-function mergeCases(localArr, remoteArr){
-  const byKey = new Map();
-  const toDate = s => { try{ return new Date(s); }catch(_){ return new Date(0);} };
-  localArr.forEach(d=>{ byKey.set(getKey(d), d); });
+calArr.forEach(d=>{ byKey.set(getKey(d), d); });
   remoteArr.forEach(r=>{
     const k = getKey(r);
     if(!byKey.has(k)){ byKey.set(k, r); }
@@ -1130,12 +1187,29 @@ function initApp() {
 
 /** Fast recalc for Definisi Kasus when lab values change (added) */
 function bindLabFastRecalc(){
-  ['leukosit','trombosit','bilirubin','sgot','sgpt','kreatinin','amilase','cpk','rdt','mat']
-    .forEach(function(id){
-      var el=document.getElementById(id);
-      if(el){
-        el.addEventListener('input', function(){ try{ if(typeof updateDefinisiBadge==='function') updateDefinisiBadge(); }catch(_){} });
-        el.addEventListener('change', function(){ try{ if(typeof updateDefinisiBadge==='function') updateDefinisiBadge(); }catch(_){}});
-      }
+  // Tambahan opsional: recalculation cepat definisi kasus saat nilai lab berubah.
+  const labIds = ['leukosit','trombosit','bilirubin','sgot','sgpt','kreatinin','amilase','cpk'];
+  labIds.forEach(function(id){
+    const el = document.getElementById(id);
+    if(el){
+      el.addEventListener('input', function(){ 
+        try { if (typeof updateDefinisiBadge === 'function') updateDefinisiBadge(); } catch(_) {}
+      });
+      el.addEventListener('change', function(){ 
+        try { if (typeof updateDefinisiBadge === 'function') updateDefinisiBadge(); } catch(_) {}
+      });
+    }
+  });
+
+  const radioNames = ['rdt','mat','pcr'];
+  radioNames.forEach(function(name){
+    const rds = document.querySelectorAll('input[name="'+name+'"]');
+    rds.forEach(function(rd){
+      rd.addEventListener('change', function(){
+        try { if (typeof updateDefinisiBadge === 'function') updateDefinisiBadge(); } catch(_) {}
+      });
+    });
+  });
+}
     });
 }
